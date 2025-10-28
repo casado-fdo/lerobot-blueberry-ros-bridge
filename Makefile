@@ -15,6 +15,7 @@ start:
 		-e ROS_IP=${ros_ip} \
 		-v /tmp/.X11-unix:/tmp/.X11-unix \
 		-v ./scripts:/workspace/scripts \
+		-v ./data:/workspace/data \
 		--net host \
 		--name lerobot lerobot:latest
 

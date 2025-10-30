@@ -5,7 +5,7 @@ from lerobot.robots import RobotConfig
 
 
 @dataclass
-class BlueberryInterfaceConfig:
+class ROSInterfaceConfig:
     # Namespace used by ros_control nodes
     namespace: str = ""
 
@@ -29,16 +29,16 @@ class BlueberryInterfaceConfig:
 
 
 @dataclass
-class BlueberryConfig(RobotConfig):
+class ROSConfig(RobotConfig):
     # cameras
     cameras: dict[str, CameraConfig] = field(default_factory=dict)
 
     # ROS interface configuration
-    ros_interface: BlueberryInterfaceConfig = field(default_factory=BlueberryInterfaceConfig)
+    ros_interface: ROSInterfaceConfig = field(default_factory=ROSInterfaceConfig)
 
 
 @RobotConfig.register_subclass("blueberry")
 @dataclass
-class BlueberryRobotConfig(BlueberryConfig):
+class BlueberryROSConfig(ROSConfig):
     """Configuration for Blueberry robot."""
-    ros_interface: BlueberryInterfaceConfig = field(default_factory=BlueberryInterfaceConfig)
+    ros_interface: ROSInterfaceConfig = field(default_factory=ROSInterfaceConfig)

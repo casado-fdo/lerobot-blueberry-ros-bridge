@@ -1,14 +1,20 @@
 import rospy
+import time 
+import threading
+import logging
+
 from lerobot.utils.errors import DeviceNotConnectedError
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
 
-from .config import BlueberryInterfaceConfig
+from .config import ROSInterfaceConfig
 
-class BlueberryInterface:
+logger = logging.getLogger(__name__)
+
+class ROSInterface:
     """Class to interface with our custom Blueberry robot (ROS Noetic)."""
 
-    def __init__(self, config: BlueberryInterfaceConfig):
+    def __init__(self, config: ROSInterfaceConfig):
         self.config = config
         self.robot_node = None
         self.pos_cmd_pub = None
@@ -17,15 +23,19 @@ class BlueberryInterface:
         self._last_joint_state = None
 
     def connect(self) -> None:
-        rospy.init_node("ros_lerobot_blueberry_interface", anonymous=True)
+        if not rospy.get_node_uri():
+            rospy.init_node("lerobot_ros_interface_node", anonymous=True)
 
-        self.pos_cmd_pub = rospy.Publisher("/TODO", Float64MultiArray, queue_size=10)
+        self.pos_cmd_pub = rospy.Publisher("/TODO", Float64MultiArray, queue_size=10) # TODO
         self.joint_state_sub = rospy.Subscriber("joint_states", JointState, self._joint_state_callback)
+
+        time.sleep(3)  # Give some time to connect to services and receive messages
+
         self.is_connected = True
 
     def send_joint_position_command(self, joint_positions: list[float], unnormalize: bool = True) -> None:
         if not self.is_connected:
-            raise DeviceNotConnectedError("BlueberryInterface is not connected. You need to call `connect()`.")
+            raise DeviceNotConnectedError("ROSInterface is not connected. You need to call `connect()`.")
 
         if unnormalize:
             if self.config.min_joint_positions is None or self.config.max_joint_positions is None:

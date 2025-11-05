@@ -38,8 +38,6 @@ classifiers = [
 dependencies = [
     "lerobot",
     "rospy",
-    "control_msgs",
-    "sensor_msgs",
     "std_msgs",
     "geometry_msgs",
 ]

@@ -1,5 +1,7 @@
 ROS_MASTER_URI ?= http://127.0.1:11311
 ROS_IP ?= 127.0.0.1
+XSOCK ?= /tmp/.X11-unix
+XAUTH ?= /tmp/.docker.xauth
 
 .build:
 	docker build -t lerobot:latest -f Dockerfile . 
@@ -18,31 +20,24 @@ start:
 		-e ROS_MASTER_URI=${ROS_MASTER_URI} \
 		-e ROS_IP=${ROS_IP} \
 		-e HUGGINGFACE_HUB_TOKEN=${HUGGINGFACE_HUB_TOKEN} \
-		-v /tmp/.X11-unix:/tmp/.X11-unix \
+		-e "NVIDIA_VISIBLE_DEVICES=all" \
+		-e "NVIDIA_DRIVER_CAPABILITIES=all" \
+		-e XAUTHORITY=${XAUTH} \
+		-v ${XSOCK}:${XSOCK} \
+		-v ${XAUTH}:${XAUTH} \
 		-v ./lerobot_robot_ros:/workspace/lerobot_robot_ros \
 		-v ./lerobot_teleoperator_ros:/workspace/lerobot_teleoperator_ros \
 		-v ./scripts:/workspace/scripts \
 		-v ./data:/workspace/data \
+		-v /dev:/dev \
 		--net host \
 		--gpus all \
 		-t \
 		--name lerobot lerobot:latest
 
-teleop: .start_if_not_running
-	docker exec -it lerobot \
-		bash -c "lerobot-teleoperate \
-		--robot.type=blueberry \
-		--teleop.type=leap_motion_ros \
-		--display_data=false"
-
 record: .start_if_not_running
 	docker exec -it lerobot \
-		bash -c "lerobot-record \
-			--robot.type=blueberry \
-			--dataset.repo_id='.data/record-test' \
-			--dataset.single_task='test' \
-			--teleop.type=leap_motion_ros \
-			--display_data=false"
+		bash -c "hf auth login --token ${HUGGINGFACE_HUB_TOKEN} && python scripts/data_collector.py"
 
 debug: .start_if_not_running
 	docker exec -it lerobot bash

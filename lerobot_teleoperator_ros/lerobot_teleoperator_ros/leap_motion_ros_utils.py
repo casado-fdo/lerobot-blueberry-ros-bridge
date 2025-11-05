@@ -1,23 +1,55 @@
 import numpy as np
-import logging
+import rospy
+from geometry_msgs.msg import TwistStamped
 
 class LeapMotionROSInterface():
     """Stream hand pose commands (left and right) from leap motion input."""
 
     def __init__(self):
-        # TODO: Initialize ROS node and subscribers here
-        pass
+        # Initialize ROS node
+        if not rospy.get_node_uri():
+            rospy.init_node('lerobot_teleop_ros_interface', anonymous=True)
 
-    def start(self):
-        # TODO: Check here that the ros node is running
-        logging.info("Starting Leap Motion ROS Interface...")
-        pass
+        # Subscribe to the teleoperation data
+        self.sub_arm1_teleop = rospy.Subscriber('/l_kinova_/leap_teleop/cartesian_velocity', TwistStamped, self.arm1_teleop_callback) # TODO: pass them as parameters
+        self.sub_arm2_teleop = rospy.Subscriber('/r_kinova_/leap_teleop/cartesian_velocity', TwistStamped, self.arm2_teleop_callback)
 
-    def stop(self):
-        #TODO: Clean up any resources if needed
-        logging.info("Stopping Leap Motion ROS Interface...")
-        pass
+        self.last_left_vel_command = TwistStamped()
+        self.last_right_vel_command = TwistStamped()
+
 
     def get_latest_data(self) -> np.ndarray:
-        # TODO: Implement ROS topic subscription to get latest Leap Motion data
-        return np.zeros(14, dtype=np.float32)
+        # Return the latest data as a numpy array
+        left_linear = [self.last_left_vel_command.twist.linear.x,
+                       self.last_left_vel_command.twist.linear.y,
+                       self.last_left_vel_command.twist.linear.z]
+        left_angular = [self.last_left_vel_command.twist.angular.x,
+                        self.last_left_vel_command.twist.angular.y,
+                        self.last_left_vel_command.twist.angular.z]
+        right_linear = [self.last_right_vel_command.twist.linear.x,
+                        self.last_right_vel_command.twist.linear.y,
+                        self.last_right_vel_command.twist.linear.z]
+        right_angular = [self.last_right_vel_command.twist.angular.x,
+                         self.last_right_vel_command.twist.angular.y,
+                         self.last_right_vel_command.twist.angular.z]
+
+        # Reset the last commands after reading
+        self.last_left_vel_command = TwistStamped()
+        self.last_right_vel_command = TwistStamped()
+
+        return np.array(left_linear + left_angular + right_linear + right_angular)
+
+
+    def arm1_teleop_callback(self, data):
+        # Get the position and orientation of the hand
+        self.last_left_vel_command = data
+    
+
+    def arm2_teleop_callback(self, data):
+        # Get the position and orientation of the hand
+        self.last_right_vel_command = data
+
+
+    def stop(self):
+        # Stop the interface
+        rospy.signal_shutdown("Leap Motion ROS Interface stopped.")

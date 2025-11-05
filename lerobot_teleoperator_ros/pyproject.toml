@@ -36,8 +36,10 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
-    "rospy",
     "lerobot",
+    "rospy",
+    "std_msgs",
+    "geometry_msgs",
 ]
 
 [tool.ruff]

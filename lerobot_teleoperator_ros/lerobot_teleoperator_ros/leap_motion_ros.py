@@ -27,20 +27,18 @@ class LeapMotionROSTeleop(Teleoperator):
             "dtype": "float32",
             "shape": (14,),
             "names": {
-                "left_pos.x": 0,
-                "left_pos.y": 1,
-                "left_pos.z": 2,
-                "left_rot.qx": 3,
-                "left_rot.qy": 4,
-                "left_rot.qz": 5,
-                "left_rot.qw": 6,
-                "right_pos.x": 7,
-                "right_pos.y": 8,
-                "right_pos.z": 9,
-                "right_rot.qx": 10,
-                "right_rot.qy": 11,
-                "right_rot.qz": 12,
-                "right_rot.qw": 13,
+                "left_linear.x": 0,
+                "left_linear.y": 1,
+                "left_linear.z": 2,
+                "left_angular.x": 3,
+                "left_angular.y": 4,
+                "left_angular.z": 5,
+                "right_linear.x": 6,
+                "right_linear.y": 7,
+                "right_linear.z": 8,
+                "right_angular.x": 9,
+                "right_angular.y": 10,
+                "right_angular.z": 11,
             },
         }
 
@@ -50,7 +48,6 @@ class LeapMotionROSTeleop(Teleoperator):
 
     def connect(self) -> None:
         self.leap = LeapMotionROSInterface()
-        self.leap.start()
 
     def get_action(self) -> dict[str, Any]:
         # Update the controller to get fresh inputs
@@ -61,20 +58,18 @@ class LeapMotionROSTeleop(Teleoperator):
         leap_action = self.leap.get_latest_data()
 
         action_dict = {
-            "left_pos.x": leap_action[0],
-            "left_pos.y": leap_action[1],
-            "left_pos.z": leap_action[2],
-            "left_rot.qx": leap_action[3],
-            "left_rot.qy": leap_action[4],
-            "left_rot.qz": leap_action[5],
-            "left_rot.qw": leap_action[6],
-            "right_pos.x": leap_action[7],
-            "right_pos.y": leap_action[8],
-            "right_pos.z": leap_action[9],
-            "right_rot.qx": leap_action[10],
-            "right_rot.qy": leap_action[11],
-            "right_rot.qz": leap_action[12],
-            "right_rot.qw": leap_action[13],
+            "left_linear.x": leap_action[0],
+            "left_linear.y": leap_action[1],
+            "left_linear.z": leap_action[2],
+            "left_angular.x": leap_action[3],
+            "left_angular.y": leap_action[4],
+            "left_angular.z": leap_action[5],
+            "right_linear.x": leap_action[6],
+            "right_linear.y": leap_action[7],
+            "right_linear.z": leap_action[8],
+            "right_angular.x": leap_action[9],
+            "right_angular.y": leap_action[10],
+            "right_angular.z": leap_action[11],
         }
 
         return action_dict

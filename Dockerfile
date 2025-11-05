@@ -3,6 +3,7 @@ FROM pytorch/pytorch:2.9.0-cuda12.8-cudnn9-runtime
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
+    net-tools iputils-ping \
     python3-dev pkg-config libavformat-dev \
     libavcodec-dev libavdevice-dev libavutil-dev \
     libswscale-dev libswresample-dev libavfilter-dev \
@@ -12,6 +13,11 @@ RUN apt-get update && apt-get install -y \
 # Install LeRobot and dependencies
 RUN pip3 install --upgrade pip && \
     pip3 install 'lerobot[all]'
+
+# Install extra dependencies for rerun and text-to-speech inside Docker
+RUN apt-get update && \
+    apt-get install -y python3-pip libgtk-3-dev libxkbcommon-x11-0 vulkan-tools mpg123
+RUN pip3 install gTTS pydub
 
 # Install rospypi to interface with ROS Noetic
 RUN pip3 install --extra-index-url https://rospypi.github.io/simple/ rospy-all

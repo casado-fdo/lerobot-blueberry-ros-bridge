@@ -41,4 +41,39 @@ class ROSConfig(RobotConfig):
 @dataclass
 class BlueberryROSConfig(ROSConfig):
     """Configuration for Blueberry robot."""
-    ros_interface: ROSInterfaceConfig = field(default_factory=ROSInterfaceConfig)
+    ros_interface: ROSInterfaceConfig = field(
+        default_factory=lambda: ROSInterfaceConfig(
+            namespace="blueberry",
+            arm_joint_names=[
+                "left_kinova_j1",
+                "left_kinova_j2",
+                "left_kinova_j3",
+                "left_kinova_j4",
+                "left_kinova_j5",
+                "left_kinova_j6",
+                "right_kinova_j1",
+                "right_kinova_j2",
+                "right_kinova_j3",
+                "right_kinova_j4",
+                "right_kinova_j5",
+                "right_kinova_j6",
+            ],
+            base_link="blueberry_base_link",
+            min_joint_positions=[
+                -1.0,
+                -1.0,
+                -1.0,
+                -1.0,
+                -1.0,
+                -1.0,
+            ],
+            max_joint_positions=[
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+            ],
+        ),
+    )

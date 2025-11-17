@@ -1,17 +1,19 @@
 import rospy
 import time 
+import os
 
 from lerobot.utils.errors import DeviceNotConnectedError
 from geometry_msgs.msg import TwistStamped
 from std_msgs.msg import Float32MultiArray
 
-from .config import ROSInterfaceConfig
+from .config import BlueberryROSConfig
 
+os.environ['ROS_PYTHON_LOG_CONFIG_FILE'] = '|'  # specify dummy file
 
-class ROSInterface:
+class BlueberryROSInterface:
     """Class to interface with our custom Blueberry robot (ROS Noetic)."""
 
-    def __init__(self, config: ROSInterfaceConfig):
+    def __init__(self, config: BlueberryROSConfig):
         self.config = config
         self.robot_node = None
         self.r_kinova_teleop_cmd_pub = None
@@ -23,10 +25,10 @@ class ROSInterface:
         if not rospy.get_node_uri():
             rospy.init_node("lerobot_ros_interface_node", anonymous=True)
 
-        self.r_kinova_teleop_cmd_pub = rospy.Publisher("/r_kinova_/lerobot/cartesian_velocity", TwistStamped, queue_size=10) # TODO: pass them as parameters
-        self.l_kinova_teleop_cmd_pub = rospy.Publisher("/l_kinova_/lerobot/cartesian_velocity", TwistStamped, queue_size=10)
-        self.joint_state_pos_sub = rospy.Subscriber("/blueberry/joint_state/positions", Float32MultiArray, self._joint_state_pos_callback)
-        self.joint_state_vel_sub = rospy.Subscriber("/blueberry/joint_state/velocities", Float32MultiArray, self._joint_state_vel_callback)
+        self.r_kinova_teleop_cmd_pub = rospy.Publisher(self.config.right_arm_teleop_topic, TwistStamped, queue_size=10) 
+        self.l_kinova_teleop_cmd_pub = rospy.Publisher(self.config.left_arm_teleop_topic, TwistStamped, queue_size=10)
+        self.joint_state_pos_sub = rospy.Subscriber(self.config.robot_joint_state_pos_topic, Float32MultiArray, self._joint_state_pos_callback)
+        self.joint_state_vel_sub = rospy.Subscriber(self.config.robot_joint_state_vel_topic, Float32MultiArray, self._joint_state_vel_callback)
 
         time.sleep(2) # Give some time to connect to services and receive messages
 
@@ -57,7 +59,7 @@ class ROSInterface:
 
     def send_leap_command(self, leap_command: dict[str, float]) -> None:
         if not self.is_connected:
-            raise DeviceNotConnectedError("ROSInterface is not connected. You need to call `connect()`.")
+            raise DeviceNotConnectedError("BlueberryROSInterface is not connected. You need to call `connect()`.")
       
         if self.r_kinova_teleop_cmd_pub is None or self.l_kinova_teleop_cmd_pub is None:
             raise DeviceNotConnectedError("Kinova command publishers are not initialised.")

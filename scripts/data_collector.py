@@ -1,7 +1,6 @@
-#from lerobot.cameras.opencv.configuration_opencv import OpenCVCameraConfig
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.datasets.utils import hw_to_dataset_features
-from lerobot_robot_ros import ROSRobot, BlueberryROSConfig
+from lerobot_robot_ros import BlueberryROS, BlueberryROSConfig
 from lerobot_teleoperator_ros import LeapMotionROSTeleop, LeapMotionROSTeleopConfig
 from lerobot.utils.control_utils import init_keyboard_listener
 from lerobot.utils.visualization_utils import init_rerun
@@ -22,12 +21,15 @@ PLAY_SOUNDS = True
 
 
 # Create the robot and teleoperator configurations
-#camera_config = {"front": OpenCVCameraConfig(index_or_path=0, width=640, height=480, fps=FPS)}
-robot_config = BlueberryROSConfig(id="blueberry") # , cameras=camera_config)
-teleop_config = LeapMotionROSTeleopConfig(id="blueberry_leap_teleop")
+robot_config = BlueberryROSConfig() # default config
+teleop_config = LeapMotionROSTeleopConfig(
+    id="blueberry_leap_teleop",
+    left_arm_topic="/l_kinova_/leap_teleop/cartesian_velocity",
+    right_arm_topic="/r_kinova_/leap_teleop/cartesian_velocity"
+)
 
 # Initialize the robot and teleoperator
-robot = ROSRobot(robot_config)
+robot = BlueberryROS(robot_config)
 teleop = LeapMotionROSTeleop(teleop_config)
 
 teleop_action_processor, robot_action_processor, robot_observation_processor = make_default_processors()

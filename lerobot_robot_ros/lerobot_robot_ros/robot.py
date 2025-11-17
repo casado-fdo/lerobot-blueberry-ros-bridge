@@ -7,19 +7,19 @@ from lerobot.robots import Robot
 from lerobot.robots.utils import ensure_safe_goal_position
 from lerobot.utils.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError
 
-from .config import ROSConfig
-from .ros_interface import ROSInterface
+from .config import BlueberryROSConfig
+from .ros_interface import BlueberryROSInterface
 
 
 
-class ROSRobot(Robot):
-    config_class = ROSConfig
-    name = "ros_robot"
+class BlueberryROS(Robot):
+    config_class = BlueberryROSConfig
+    name = "blueberry_ros"
 
-    def __init__(self, config: ROSConfig):
+    def __init__(self, config: BlueberryROSConfig):
         super().__init__(config)
         self.config = config
-        self.ros_interface = ROSInterface(config.ros_interface)
+        self.ros_interface = BlueberryROSInterface(config)
         #self.cameras = make_cameras_from_configs(config.cameras)
 
     @property
@@ -30,7 +30,7 @@ class ROSRobot(Robot):
 
     @cached_property
     def observation_features(self) -> dict[str, type | tuple]:
-        all_joint_names = self.config.ros_interface.arm_joint_names.copy()
+        all_joint_names = self.config.arm_joint_names.copy()
         motor_state_ft = {f"{motor}.pos": float for motor in all_joint_names}
         return {**motor_state_ft, **self._cameras_ft}
         return None
@@ -111,7 +111,3 @@ class ROSRobot(Robot):
         #for cam in self.cameras.values():
         #    cam.disconnect()
         self.ros_interface.disconnect()
-
-
-class BlueberryROS(ROSRobot):
-    pass

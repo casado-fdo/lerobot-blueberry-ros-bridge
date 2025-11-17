@@ -1,18 +1,21 @@
 import numpy as np
 import rospy
+import os
 from geometry_msgs.msg import TwistStamped
+
+os.environ['ROS_PYTHON_LOG_CONFIG_FILE'] = '|'  # specify dummy file
 
 class LeapMotionROSInterface():
     """Stream hand pose commands (left and right) from leap motion input."""
 
-    def __init__(self):
+    def __init__(self, left_arm_topic: str, right_arm_topic: str):
         # Initialize ROS node
         if not rospy.get_node_uri():
             rospy.init_node('lerobot_teleop_ros_interface', anonymous=True)
 
         # Subscribe to the teleoperation data
-        self.sub_arm1_teleop = rospy.Subscriber('/l_kinova_/leap_teleop/cartesian_velocity', TwistStamped, self.arm1_teleop_callback) # TODO: pass them as parameters
-        self.sub_arm2_teleop = rospy.Subscriber('/r_kinova_/leap_teleop/cartesian_velocity', TwistStamped, self.arm2_teleop_callback)
+        self.sub_arm1_teleop = rospy.Subscriber(left_arm_topic, TwistStamped, self.arm1_teleop_callback)
+        self.sub_arm2_teleop = rospy.Subscriber(right_arm_topic, TwistStamped, self.arm2_teleop_callback)
 
         self.last_left_vel_command = TwistStamped()
         self.last_right_vel_command = TwistStamped()

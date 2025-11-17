@@ -47,7 +47,10 @@ class LeapMotionROSTeleop(Teleoperator):
         return {}
 
     def connect(self) -> None:
-        self.leap = LeapMotionROSInterface()
+        self.leap = LeapMotionROSInterface(
+            left_arm_topic=self.config.left_arm_topic,
+            right_arm_topic=self.config.right_arm_topic,
+        )
 
     def get_action(self) -> dict[str, Any]:
         # Update the controller to get fresh inputs

@@ -7,8 +7,8 @@ from lerobot.robots import Robot
 from lerobot.robots.utils import ensure_safe_goal_position
 from lerobot.utils.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError
 
-from .config import BlueberryROSConfig
-from .ros_interface import BlueberryROSInterface
+from .config_blueberry import BlueberryROSConfig
+from .ros_interface_blueberry import BlueberryROSInterface
 
 
 

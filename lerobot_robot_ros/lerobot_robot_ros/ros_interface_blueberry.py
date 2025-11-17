@@ -6,7 +6,7 @@ from lerobot.utils.errors import DeviceNotConnectedError
 from geometry_msgs.msg import TwistStamped
 from std_msgs.msg import Float32MultiArray
 
-from .config import BlueberryROSConfig
+from .config_blueberry import BlueberryROSConfig
 
 os.environ['ROS_PYTHON_LOG_CONFIG_FILE'] = '|'  # specify dummy file
 

@@ -1,2 +1,2 @@
-from .config import BlueberryROSConfig
-from .robot import BlueberryROS 
+from .config_blueberry import BlueberryROSConfig
+from .robot_blueberry import BlueberryROS 

@@ -1,8 +1,10 @@
 from dataclasses import dataclass, field
 
-from lerobot.cameras import CameraConfig
+from lerobot.cameras.realsense.configuration_realsense import RealSenseCameraConfig
+from lerobot.cameras.configs import ColorMode, Cv2Rotation
 from lerobot.robots import RobotConfig
 
+import os
 
 @RobotConfig.register_subclass("blueberry")
 @dataclass
@@ -10,9 +12,27 @@ class BlueberryROSConfig(RobotConfig):
     """Configuration for Blueberry robot."""
 
     # Cameras configuration
-    # cameras: dict[str, CameraConfig] = field(default_factory=dict)
-    # camera_config = {"front": OpenCVCameraConfig(index_or_path=0, width=640, height=480, fps=FPS)}
-
+    left_camera_config = RealSenseCameraConfig(
+        serial_number_or_name=os.getenv("LEFT_RS_SERIAL_NO"), 
+        fps=int(os.getenv("RECORDING_FPS", "30")),
+        width=640,
+        height=480,
+        color_mode=ColorMode.RGB,
+        use_depth=False, # Depth is not supported yet by lerobot
+        rotation=Cv2Rotation.ROTATE_180
+    )
+    right_camera_config = RealSenseCameraConfig(
+        serial_number_or_name=os.getenv("RIGHT_RS_SERIAL_NO"), 
+        fps=int(os.getenv("RECORDING_FPS", "30")),
+        width=640,
+        height=480,
+        color_mode=ColorMode.RGB,
+        use_depth=False, # Depth is not supported yet by lerobot
+        rotation=Cv2Rotation.NO_ROTATION
+    )
+    cameras: dict[str, RealSenseCameraConfig] = field(default_factory=lambda: {"left": BlueberryROSConfig.left_camera_config, "right": BlueberryROSConfig.right_camera_config})
+    
+    
     # ROS interface configuration
     namespace: str = "blueberry"
     

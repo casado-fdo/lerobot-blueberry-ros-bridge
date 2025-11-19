@@ -19,9 +19,9 @@ start:
 		-e DISPLAY \
 		-e ROS_MASTER_URI=${ROS_MASTER_URI} \
 		-e ROS_IP=${ROS_IP} \
-		-e HUGGINGFACE_HUB_TOKEN=${HUGGINGFACE_HUB_TOKEN} \
 		-e "NVIDIA_VISIBLE_DEVICES=all" \
 		-e "NVIDIA_DRIVER_CAPABILITIES=all" \
+		--env-file $(ENV_FILE) \
 		-e XAUTHORITY=${XAUTH} \
 		-v ${XSOCK}:${XSOCK} \
 		-v ${XAUTH}:${XAUTH} \

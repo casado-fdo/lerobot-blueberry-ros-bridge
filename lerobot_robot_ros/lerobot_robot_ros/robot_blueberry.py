@@ -20,12 +20,12 @@ class BlueberryROS(Robot):
         super().__init__(config)
         self.config = config
         self.ros_interface = BlueberryROSInterface(config)
-        #self.cameras = make_cameras_from_configs(config.cameras)
+        self.cameras = make_cameras_from_configs(config.cameras)
 
     @property
     def _cameras_ft(self) -> dict[str, tuple]:
         return {
-            # cam: (self.config.cameras[cam].height, self.config.cameras[cam].width, 3) for cam in self.cameras
+            cam: (self.config.cameras[cam].height, self.config.cameras[cam].width, 3) for cam in self.cameras
         }
 
     @cached_property
@@ -54,14 +54,14 @@ class BlueberryROS(Robot):
 
     @property
     def is_connected(self) -> bool:
-        return self.ros_interface.is_connected # and all(cam.is_connected for cam in self.cameras.values())
+        return self.ros_interface.is_connected and all(cam.is_connected for cam in self.cameras.values())
 
     def connect(self, calibrate: bool = True) -> None:
         if self.is_connected:
             raise DeviceAlreadyConnectedError(f"{self} already connected")
 
-        #for cam in self.cameras.values():
-        #    cam.connect()
+        for cam in self.cameras.values():
+           cam.connect()
         self.ros_interface.connect()
 
     @property
@@ -85,13 +85,13 @@ class BlueberryROS(Robot):
         obs_dict.update({f"{joint}.pos": pos for joint, pos in joint_state["position"].items()})
 
         # Capture images from cameras
-        #for cam_key, cam in self.cameras.items():
-        #    start = time.perf_counter()
-        #    try:
-        #        obs_dict[cam_key] = cam.async_read(timeout_ms=300)
-        #    except Exception as e:
-        #        obs_dict[cam_key] = None
-        #    dt_ms = (time.perf_counter() - start) * 1e3
+        for cam_key, cam in self.cameras.items():
+            start = time.perf_counter()
+            try:
+                obs_dict[cam_key] = cam.async_read(timeout_ms=300)
+            except Exception as e:
+                obs_dict[cam_key] = None
+            dt_ms = (time.perf_counter() - start) * 1e3
 
         return obs_dict
 
@@ -108,6 +108,6 @@ class BlueberryROS(Robot):
         if not self.is_connected:
             raise DeviceNotConnectedError(f"{self} is not connected.")
 
-        #for cam in self.cameras.values():
-        #    cam.disconnect()
+        for cam in self.cameras.values():
+            cam.disconnect()
         self.ros_interface.disconnect()

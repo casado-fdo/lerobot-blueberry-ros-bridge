@@ -1,52 +1,35 @@
-FROM pytorch/pytorch:2.9.0-cuda12.8-cudnn9-runtime
+FROM dustynv/realsense:r36.2.0
 
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    cmake \
-    net-tools iputils-ping \
-    python3-dev pkg-config libavformat-dev \
+RUN apt-get update && apt upgrade -y && apt-get install -y --upgrade \
+    build-essential cmake net-tools iputils-ping \
+    python3-dev python3-pip pkg-config libavformat-dev \
     libavcodec-dev libavdevice-dev libavutil-dev \
     libswscale-dev libswresample-dev libavfilter-dev \
-    libglib2.0-0 libgl1-mesa-glx libegl1-mesa ffmpeg \
-    speech-dispatcher libgeos-dev
+    libglib2.0-0 ffmpeg speech-dispatcher libgeos-dev \
+    libssl-dev libusb-1.0-0-dev pkg-config udev \
+    libudev-dev libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev \
+    curl lsb-release git
+
+# Update the index URLs to point to the JetPack 7 / CUDA compatible repos
+ENV PIP_INDEX_URL=https://pypi.jetson-ai-lab.io/sbsa/cu128
+ENV PIP_EXTRA_INDEX_URL=https://pypi.org/simple
+
+# The installer requires curl (and certificates) to download the release archive
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
+RUN pip install --upgrade pip
 
 # Install extra dependencies for rerun and text-to-speech inside Docker
 RUN apt-get update && \
     apt-get install -y python3-pip libgtk-3-dev libxkbcommon-x11-0 vulkan-tools mpg123
-RUN pip3 install gTTS pydub
-
-# Install RealSense SDK
-RUN apt-get install -y libssl-dev \
-    libusb-1.0-0-dev \
-    pkg-config \
-    udev \
-    libudev-dev \
-    libglfw3-dev \
-    libgl1-mesa-dev \
-    libglu1-mesa-dev \
-    curl \
-    lsb-release \
-    git
-WORKDIR /usr/src
-RUN git clone https://github.com/IntelRealSense/librealsense.git
-WORKDIR /usr/src/librealsense
-RUN mkdir build && cd build && \
-    cmake .. \
-    -DFORCE_RSUSB_BACKEND=true \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_PYTHON_BINDINGS=true && \
-    make -j$(nproc)
-WORKDIR /usr/src/librealsense/build
-RUN make install
-RUN pip install pyrealsense2
-RUN cp /usr/src/librealsense/config/99-realsense-libusb.rules /etc/udev/rules.d/
+RUN pip install gTTS
 
 # Install LeRobot and dependencies
-RUN pip3 install --upgrade pip && \
-    pip3 install 'lerobot[intelrealsense]'
+RUN git clone https://github.com/huggingface/lerobot.git
+RUN cd lerobot && \
+    pip install -e . 
 
 # Install rospypi to interface with ROS Noetic
-RUN pip3 install --extra-index-url https://rospypi.github.io/simple/ rospy-all
+RUN pip install --extra-index-url https://rospypi.github.io/simple/ rospy-all
 
 # Set up workspace
 WORKDIR /workspace
@@ -59,8 +42,8 @@ COPY lerobot_robot_ros /workspace/lerobot_robot_ros/
 COPY lerobot_teleoperator_ros /workspace/lerobot_teleoperator_ros/
 
 # Install lerobot custom HW packages
-RUN pip3 install -e lerobot_robot_ros
-RUN pip3 install -e lerobot_teleoperator_ros
+RUN pip install -e lerobot_robot_ros 
+RUN pip install -e lerobot_teleoperator_ros
 
 # Copy scripts
 COPY scripts /workspace/scripts/

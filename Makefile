@@ -2,6 +2,7 @@ ROS_MASTER_URI ?= http://127.0.0.1:11311
 ROS_IP ?= 127.0.0.1
 XSOCK ?= /tmp/.X11-unix
 XAUTH ?= /tmp/.docker.xauth
+XDG_RUNTIME_DIR ?= /run/user/$(shell id -u)
 
 .build:
 	docker build -t lerobot:latest -f Dockerfile . 
@@ -23,6 +24,8 @@ start:
 		-e "NVIDIA_DRIVER_CAPABILITIES=all" \
 		--env-file $(ENV_FILE) \
 		-e XAUTHORITY=${XAUTH} \
+		-e PULSE_SERVER=unix:${XDG_RUNTIME_DIR}/pulse/native \
+		-v ${XDG_RUNTIME_DIR}/pulse:${XDG_RUNTIME_DIR}/pulse \
 		-v ${XSOCK}:${XSOCK} \
 		-v ${XAUTH}:${XAUTH} \
 		-v ./lerobot_robot_ros:/workspace/lerobot_robot_ros \
@@ -32,12 +35,13 @@ start:
 		-v /dev:/dev \
 		--net host \
 		--gpus all \
+		--runtime nvidia \
 		-t \
 		--name lerobot lerobot:latest
 
 record: .start_if_not_running
 	docker exec -it lerobot \
-		bash -c "hf auth login --token ${HUGGINGFACE_HUB_TOKEN} && python scripts/data_collector.py"
+		bash -c "hf auth login --token ${HUGGINGFACE_HUB_TOKEN} && python3 scripts/data_collector.py"
 
 debug: .start_if_not_running
 	docker exec -it lerobot bash

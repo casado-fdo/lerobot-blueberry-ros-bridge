@@ -15,6 +15,7 @@ class BlueberryROSConfig(RobotConfig):
     left_camera_config = RealSenseCameraConfig(
         serial_number_or_name=os.getenv("LEFT_RS_SERIAL_NO"), 
         fps=int(os.getenv("RECORDING_FPS", "30")),
+        warmup_s=0,
         width=640,
         height=480,
         color_mode=ColorMode.RGB,
@@ -24,6 +25,7 @@ class BlueberryROSConfig(RobotConfig):
     right_camera_config = RealSenseCameraConfig(
         serial_number_or_name=os.getenv("RIGHT_RS_SERIAL_NO"), 
         fps=int(os.getenv("RECORDING_FPS", "30")),
+        warmup_s=0,
         width=640,
         height=480,
         color_mode=ColorMode.RGB,

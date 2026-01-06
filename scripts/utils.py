@@ -1,8 +1,6 @@
 import os
 import subprocess
 from gtts import gTTS
-from pydub import AudioSegment 
-
 
 def say(text):
     """

@@ -7,8 +7,7 @@ from lerobot.utils.visualization_utils import init_rerun
 from lerobot.scripts.lerobot_record import record_loop
 from lerobot.processor import make_default_processors
 from lerobot.utils.constants import ACTION, OBS_STR
-#from lerobot.utils.utils import log_say
-from utils import say, log_say
+from utils import log_say
 import time, os
 
 
@@ -17,11 +16,12 @@ FPS = int(os.getenv("RECORDING_FPS", "30"))
 EPISODE_TIME_SEC = int(os.getenv("RECORDING_EPISODE_TIME_SEC", "10"))
 RESET_TIME_SEC = int(os.getenv("RECORDING_RESET_TIME_SEC", "5"))
 TASK_DESCRIPTION = os.getenv("RECORDING_TASK_DESCRIPTION", "No task description provided.")
-PLAY_SOUNDS = os.getenv("RECORDING_PLAY_SOUNDS", "True").lower() in ("true", "1", "yes")
+PLAY_SOUNDS = bool(os.getenv("RECORDING_PLAY_SOUNDS", "True").lower() in ("true", "1", "yes"))
 HF_USERNAME = os.getenv("HUGGINGFACE_USERNAME", "your-username-here")
 HF_DATASET_NAME = os.getenv("HUGGINGFACE_DATASET_NAME", "default")
 HF_REPO_ID = f"{HF_USERNAME}/{HF_DATASET_NAME}"
 
+log_say("Initializing data collection...", play_sounds=True)
 
 # Create the robot and teleoperator configurations
 robot_config = BlueberryROSConfig() # default config
@@ -69,7 +69,7 @@ teleop.connect()
 
 # Initialize the keyboard listener and rerun visualization
 listener, events = init_keyboard_listener()
-init_rerun(session_name="blueberry_recording")
+# init_rerun(session_name="blueberry_recording")
 
 if not robot.is_connected or not teleop.is_connected:
     raise ValueError("Robot or teleop is not connected!")

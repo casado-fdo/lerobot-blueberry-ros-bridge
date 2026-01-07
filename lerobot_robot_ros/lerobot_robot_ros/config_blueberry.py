@@ -46,12 +46,14 @@ class BlueberryROSConfig(RobotConfig):
         "left_kinova_j4",
         "left_kinova_j5",
         "left_kinova_j6",
+        "left_kinova_j7",
         "right_kinova_j1",
         "right_kinova_j2",
         "right_kinova_j3",
         "right_kinova_j4",
         "right_kinova_j5",
         "right_kinova_j6",
+        "right_kinova_j7",
         ]
     )
     
@@ -65,10 +67,12 @@ class BlueberryROSConfig(RobotConfig):
         -1.0,
         -1.0,
         -1.0,
+        -1.0,
         ]
     )
     max_joint_positions: list[float] = field(
         default_factory=lambda: [
+        1.0,
         1.0,
         1.0,
         1.0,

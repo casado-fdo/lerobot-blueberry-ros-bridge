@@ -1,4 +1,17 @@
-FROM dustynv/realsense:r36.2.0
+####################################################################
+# Follow these instructions before building the Docker image:
+#   1. Copy the nv_tegra_release file from the host system into 
+#      the project's folder:
+#         cp /etc/nv_tegra_release .
+#   2. Build the base image for your specific Jetson specs:
+#         git clone https://github.com/dusty-nv/jetson-containers
+#         bash jetson-containers/install.sh
+#         jetson-containers build lerobot
+#   3. Build this Docker image starting from the base image created
+#      in the previous step (update the FROM line below if needed)
+#####################################################################
+
+FROM lerobot:r38.3.arm64-sbsa-cu130-24.04
 
 RUN apt-get update && apt upgrade -y && apt-get install -y --upgrade \
     build-essential cmake net-tools iputils-ping \
@@ -8,25 +21,36 @@ RUN apt-get update && apt upgrade -y && apt-get install -y --upgrade \
     libglib2.0-0 ffmpeg speech-dispatcher libgeos-dev \
     libssl-dev libusb-1.0-0-dev pkg-config udev \
     libudev-dev libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev \
-    curl lsb-release git
-
-# Update the index URLs to point to the JetPack 7 / CUDA compatible repos
-ENV PIP_INDEX_URL=https://pypi.jetson-ai-lab.io/sbsa/cu128
-ENV PIP_EXTRA_INDEX_URL=https://pypi.org/simple
-
-# The installer requires curl (and certificates) to download the release archive
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
+    curl lsb-release git ca-certificates
 RUN pip install --upgrade pip
 
-# Install extra dependencies for rerun and text-to-speech inside Docker
+# Install extra dependencies for rerun and text-to-speech inside a Docker container
 RUN apt-get update && \
     apt-get install -y python3-pip libgtk-3-dev libxkbcommon-x11-0 vulkan-tools mpg123
 RUN pip install gTTS
 
-# Install LeRobot and dependencies
-RUN git clone https://github.com/huggingface/lerobot.git
-RUN cd lerobot && \
-    pip install -e . 
+COPY nv_tegra_release /etc/nv_tegra_release
+
+# Install RealSense SDK
+WORKDIR /usr/src
+RUN git clone https://github.com/IntelRealSense/librealsense.git
+WORKDIR /usr/src/librealsense
+RUN mkdir -p /tmp/fake-proc/device-tree
+RUN echo "NVIDIA Jetson AGX Thor Developer Kit" > /tmp/fake-proc/device-tree/model
+RUN sed -i 's|/proc/device-tree|/tmp/fake-proc/device-tree|g' scripts/patch-realsense-ubuntu-L4T.sh
+RUN ./scripts/patch-realsense-ubuntu-L4T.sh
+RUN mkdir build && cd build && \
+    cmake .. \
+    -DFORCE_RSUSB_BACKEND=true \
+    -DCMAKE_BUILD_TYPE=release \
+    -DCHECK_FOR_UPDATES=OFF \
+    -DBUILD_PYTHON_BINDINGS=true \
+    -DPYTHON_EXECUTABLE=/usr/bin/python3.12 \
+    -DBUILD_WITH_CUDA=true 
+WORKDIR /usr/src/librealsense/build
+RUN make -j$(($(nproc)-1))
+RUN make install
+RUN cp ../config/99-realsense-libusb.rules /etc/udev/rules.d/
 
 # Install rospypi to interface with ROS Noetic
 RUN pip install --extra-index-url https://rospypi.github.io/simple/ rospy-all

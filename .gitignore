@@ -209,3 +209,6 @@ __marimo__/
 
 # Data recordings
 data/*
+
+# Jetson specific
+nv_tegra_release

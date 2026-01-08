@@ -6,10 +6,6 @@ from lerobot.robots import RobotConfig
 from math import pi
 import os
 
-KINOVA_MIN_JOINT_POSITION = -2.0 * pi
-KINOVA_MAX_JOINT_POSITION = 2.0 * pi
-INSPIRE_HAND_MIN_JOINT_POSITION = 0.0
-INSPIRE_HAND_MAX_JOINT_POSITION = 1000.0
 
 @RobotConfig.register_subclass("blueberry")
 @dataclass
@@ -57,31 +53,6 @@ class BlueberryROSConfig(RobotConfig):
     )
     
     base_link: str = "blueberry_base_link"
-
-    min_joint_positions: list[float] = field(
-        default_factory=lambda: [
-            # Left kinova arm joints
-            [KINOVA_MIN_JOINT_POSITION] * 7,
-            # Left inspire hand joints
-            [INSPIRE_HAND_MIN_JOINT_POSITION] * 6,
-            # Right kinova arm joints
-            [KINOVA_MIN_JOINT_POSITION] * 7,
-            # Right inspire hand joints
-            [INSPIRE_HAND_MIN_JOINT_POSITION] * 6,
-        ]
-    )
-    max_joint_positions: list[float] = field(
-        default_factory=lambda: [
-            # Left kinova arm joints
-            [KINOVA_MAX_JOINT_POSITION] * 7,
-            # Left inspire hand joints
-            [INSPIRE_HAND_MAX_JOINT_POSITION] * 6,
-            # Right kinova arm joints
-            [KINOVA_MAX_JOINT_POSITION] * 7,
-            # Right inspire hand joints
-            [INSPIRE_HAND_MAX_JOINT_POSITION] * 6,
-        ]
-    )
 
     right_arm_teleop_topic: str = "/r_kinova_/lerobot/cartesian_velocity"
     left_arm_teleop_topic: str = "/l_kinova_/lerobot/cartesian_velocity"

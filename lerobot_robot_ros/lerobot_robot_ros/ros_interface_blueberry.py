@@ -28,33 +28,11 @@ class BlueberryROSInterface:
         self.r_kinova_teleop_cmd_pub = rospy.Publisher(self.config.right_arm_teleop_topic, TwistStamped, queue_size=10) 
         self.l_kinova_teleop_cmd_pub = rospy.Publisher(self.config.left_arm_teleop_topic, TwistStamped, queue_size=10)
         self.joint_state_pos_sub = rospy.Subscriber(self.config.robot_joint_state_pos_topic, Float32MultiArray, self._joint_state_pos_callback)
-        self.joint_state_vel_sub = rospy.Subscriber(self.config.robot_joint_state_vel_topic, Float32MultiArray, self._joint_state_vel_callback)
+        self.joint_state_effort_sub = rospy.Subscriber(self.config.robot_joint_state_effort_topic, Float32MultiArray, self._joint_state_effort_callback)
 
         time.sleep(2) # Give some time to connect to services and receive messages
 
         self.is_connected = True
-
-
-    #def send_joint_position_command(self, joint_positions: list[float], unnormalize: bool = True) -> None:
-    #    if not self.is_connected:
-    #        raise DeviceNotConnectedError("ROSInterface is not connected. You need to call `connect()`.")
-    #
-    #    if unnormalize:
-    #        if self.config.min_joint_positions is None or self.config.max_joint_positions is None:
-    #            raise ValueError("Joint position normalization requires min and max joint positions to be set.")
-    #        joint_positions = [
-    #            min(max(pos, min_pos), max_pos)
-    #            for pos, min_pos, max_pos in zip(joint_positions, self.config.min_joint_positions, self.config.max_joint_positions)
-    #        ]
-    #
-    #    if len(joint_positions) != len(self.config.arm_joint_names):
-    #        raise ValueError(f"Expected {len(self.config.arm_joint_names)} joint positions, but got {len(joint_positions)}.")
-    #
-    #    if self.teleop_cmd_pub is None:
-    #        raise DeviceNotConnectedError("Position command publisher is not initialized.")
-    #    msg = Float64MultiArray()
-    #    msg.data = joint_positions
-    #    self.teleop_cmd_pub.publish(msg)
 
 
     def send_leap_command(self, leap_command: dict[str, float]) -> None:
@@ -90,26 +68,25 @@ class BlueberryROSInterface:
     def _joint_state_pos_callback(self, msg: Float32MultiArray) -> None:
         self._last_joint_state = self._last_joint_state or {}
         positions = {}
-        for idx, joint_name in enumerate(self.config.arm_joint_names):
+        for idx, joint_name in enumerate(self.config.blueberry_joint_names):
             positions[joint_name] = msg.data[idx]
         self._last_joint_state["position"] = positions
 
-
-    def _joint_state_vel_callback(self, msg: Float32MultiArray) -> None:
+    def _joint_state_effort_callback(self, msg: Float32MultiArray) -> None:
         self._last_joint_state = self._last_joint_state or {}
-        velocities = {}
-        for idx, joint_name in enumerate(self.config.arm_joint_names):
-            velocities[joint_name] = msg.data[idx]
-        self._last_joint_state["velocity"] = velocities
-
+        effort = {}
+        for idx, joint_name in enumerate(self.config.blueberry_joint_names):
+            effort[joint_name] = msg.data[idx]
+        self._last_joint_state["effort"] = effort
+        
 
     def disconnect(self):
         if self.joint_state_pos_sub:
             self.joint_state_pos_sub.unregister()
             self.joint_state_pos_sub = None
-        if self.joint_state_vel_sub:
-            self.joint_state_vel_sub.unregister()
-            self.joint_state_vel_sub = None
+        if self.joint_state_effort_sub:
+            self.joint_state_effort_sub.unregister()
+            self.joint_state_effort_sub = None
         if self.r_kinova_teleop_cmd_pub:
             self.r_kinova_teleop_cmd_pub.unregister()
             self.r_kinova_teleop_cmd_pub = None

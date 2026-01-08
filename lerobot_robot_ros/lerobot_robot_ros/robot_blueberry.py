@@ -28,28 +28,25 @@ class BlueberryROS(Robot):
             cam: (self.config.cameras[cam].height, self.config.cameras[cam].width, 3) for cam in self.cameras
         }
 
+    @property
+    def _robot_state_ft(self) -> dict[str, type]:
+        return {
+            f"{motor}.pos": float for motor in self.config.blueberry_joint_names
+        } | {
+            f"{motor}.effort": float for motor in self.config.blueberry_joint_names
+        }    
+
     @cached_property
     def observation_features(self) -> dict[str, type | tuple]:
-        all_joint_names = self.config.arm_joint_names.copy()
-        motor_state_ft = {f"{motor}.pos": float for motor in all_joint_names}
-        return {**motor_state_ft, **self._cameras_ft}
-        return None
-
+        return {**self._robot_state_ft, **self._cameras_ft}
+ 
     @cached_property
     def action_features(self) -> dict[str, type]:
         return {
-            "left_linear.x": float,
-            "left_linear.y": float,
-            "left_linear.z": float,
-            "left_angular.x": float,
-            "left_angular.y": float,
-            "left_angular.z": float,
-            "right_linear.x": float,
-            "right_linear.y": float,
-            "right_linear.z": float,
-            "right_angular.x": float,
-            "right_angular.y": float,
-            "right_angular.z": float,
+            "left_linear.x": float, "left_linear.y": float, "left_linear.z": float,
+            "left_angular.x": float, "left_angular.y": float, "left_angular.z": float,
+            "right_linear.x": float, "right_linear.y": float, "right_linear.z": float,
+            "right_angular.x": float, "right_angular.y": float, "right_angular.z": float,
         }
 
     @property
@@ -83,6 +80,7 @@ class BlueberryROS(Robot):
         if joint_state is None:
             raise ValueError("Joint state is not available yet.")
         obs_dict.update({f"{joint}.pos": pos for joint, pos in joint_state["position"].items()})
+        obs_dict.update({f"{joint}.effort": effort for joint, effort in joint_state["effort"].items()})
 
         # Capture images from cameras
         for cam_key, cam in self.cameras.items():

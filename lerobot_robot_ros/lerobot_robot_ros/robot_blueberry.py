@@ -43,10 +43,18 @@ class BlueberryROS(Robot):
     @cached_property
     def action_features(self) -> dict[str, type]:
         return {
-            "left_linear.x": float, "left_linear.y": float, "left_linear.z": float,
-            "left_angular.x": float, "left_angular.y": float, "left_angular.z": float,
-            "right_linear.x": float, "right_linear.y": float, "right_linear.z": float,
-            "right_angular.x": float, "right_angular.y": float, "right_angular.z": float,
+            # Left arm: 6 DOF velocity commands
+            "l_arm_linear.x": float, "l_arm_linear.y": float, "l_arm_linear.z": float,
+            "l_arm_angular.x": float, "l_arm_angular.y": float, "l_arm_angular.z": float,
+            # Left hand: 6 finger position commands
+            "l_hand_pinky": float, "l_hand_ring": float, "l_hand_middle": float, 
+            "l_hand_index": float, "l_hand_thumb1": float, "l_hand_thumb2": float,
+            # Right arm: 6 DOF velocity commands
+            "r_arm_linear.x": float, "r_arm_linear.y": float, "r_arm_linear.z": float,
+            "r_arm_angular.x": float, "r_arm_angular.y": float, "r_arm_angular.z": float,
+            # Right hand: 6 finger position commands
+            "r_hand_pinky": float, "r_hand_ring": float, "r_hand_middle": float, 
+            "r_hand_index": float, "r_hand_thumb1": float, "r_hand_thumb2": float,
         }
 
     @property
@@ -97,7 +105,6 @@ class BlueberryROS(Robot):
         if not self.is_connected:
             raise DeviceNotConnectedError(f"{self} is not connected.")
 
-        #self.ros_interface.send_joint_position_command(joint_positions)
         self.ros_interface.send_leap_command(action)
 
         return action

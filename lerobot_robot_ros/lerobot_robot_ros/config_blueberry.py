@@ -33,7 +33,11 @@ class BlueberryROSConfig(RobotConfig):
         use_depth=False, # Depth is not supported yet by lerobot (TODO: add when available)
         rotation=Cv2Rotation.NO_ROTATION
     )
-    cameras: dict[str, RealSenseCameraConfig] = field(default_factory=lambda: {"left": BlueberryROSConfig.left_camera_config, "right": BlueberryROSConfig.right_camera_config})
+    cameras: dict[str, RealSenseCameraConfig] = field(
+        default_factory=lambda: {
+            "left": BlueberryROSConfig.left_camera_config, 
+            "right": BlueberryROSConfig.right_camera_config
+        })
     
     
     # ROS interface configuration
@@ -56,6 +60,7 @@ class BlueberryROSConfig(RobotConfig):
 
     right_arm_teleop_topic: str = "/r_kinova_/lerobot/cartesian_velocity"
     left_arm_teleop_topic: str = "/l_kinova_/lerobot/cartesian_velocity"
+    right_hand_teleop_topic: str = "/right_hand/lerobot/hand_angles"
+    left_hand_teleop_topic: str = "/left_hand/lerobot/hand_angles"
     robot_joint_state_pos_topic: str = "/blueberry/joint_state/position"
-    #robot_joint_state_vel_topic: str = "/blueberry/joint_state/velocities" 
     robot_joint_state_effort_topic: str = "/blueberry/joint_state/effort"

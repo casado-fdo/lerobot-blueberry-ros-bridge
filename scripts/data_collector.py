@@ -28,7 +28,9 @@ robot_config = BlueberryROSConfig() # default config
 teleop_config = LeapMotionROSTeleopConfig(
     id="blueberry_leap_teleop",
     left_arm_topic="/l_kinova_/leap_teleop/cartesian_velocity",
-    right_arm_topic="/r_kinova_/leap_teleop/cartesian_velocity"
+    right_arm_topic="/r_kinova_/leap_teleop/cartesian_velocity",
+    left_hand_topic="/left_hand/leap_teleop/hand_angles",
+    right_hand_topic="/right_hand/leap_teleop/hand_angles",
 )
 
 # Initialize the robot and teleoperator

@@ -25,20 +25,20 @@ class LeapMotionROSTeleop(Teleoperator):
     def action_features(self) -> dict:        
         return {
             "dtype": "float32",
-            "shape": (14,),
+            "shape": (24,),
             "names": {
-                "left_linear.x": 0,
-                "left_linear.y": 1,
-                "left_linear.z": 2,
-                "left_angular.x": 3,
-                "left_angular.y": 4,
-                "left_angular.z": 5,
-                "right_linear.x": 6,
-                "right_linear.y": 7,
-                "right_linear.z": 8,
-                "right_angular.x": 9,
-                "right_angular.y": 10,
-                "right_angular.z": 11,
+                # Left arm: 6 DOF velocity commands
+                "l_arm_linear.x": 0, "l_arm_linear.y": 1, "l_arm_linear.z": 2,
+                "l_arm_angular.x": 3, "l_arm_angular.y": 4, "l_arm_angular.z": 5,
+                # Left hand: 6 finger position commands
+                "l_hand_pinky": 6, "l_hand_ring": 7, "l_hand_middle": 8, 
+                "l_hand_index": 9, "l_hand_thumb1": 10, "l_hand_thumb2": 11,
+                # Right arm: 6 DOF velocity commands
+                "r_arm_linear.x": 12, "r_arm_linear.y": 13, "r_arm_linear.z": 14,
+                "r_arm_angular.x": 15, "r_arm_angular.y": 16, "r_arm_angular.z": 17,
+                # Right hand: 6 finger position commands
+                "r_hand_pinky": 18, "r_hand_ring": 19, "r_hand_middle": 20, 
+                "r_hand_index": 21, "r_hand_thumb1": 22, "r_hand_thumb2": 23,
             },
         }
 
@@ -50,6 +50,8 @@ class LeapMotionROSTeleop(Teleoperator):
         self.leap = LeapMotionROSInterface(
             left_arm_topic=self.config.left_arm_topic,
             right_arm_topic=self.config.right_arm_topic,
+            left_hand_topic=self.config.left_hand_topic,
+            right_hand_topic=self.config.right_hand_topic,
         )
 
     def get_action(self) -> dict[str, Any]:
@@ -61,18 +63,18 @@ class LeapMotionROSTeleop(Teleoperator):
         leap_action = self.leap.get_latest_data()
 
         action_dict = {
-            "left_linear.x": leap_action[0],
-            "left_linear.y": leap_action[1],
-            "left_linear.z": leap_action[2],
-            "left_angular.x": leap_action[3],
-            "left_angular.y": leap_action[4],
-            "left_angular.z": leap_action[5],
-            "right_linear.x": leap_action[6],
-            "right_linear.y": leap_action[7],
-            "right_linear.z": leap_action[8],
-            "right_angular.x": leap_action[9],
-            "right_angular.y": leap_action[10],
-            "right_angular.z": leap_action[11],
+            # Left arm
+            "l_arm_linear.x": leap_action[0], "l_arm_linear.y": leap_action[1], "l_arm_linear.z": leap_action[2],
+            "l_arm_angular.x": leap_action[3], "l_arm_angular.y": leap_action[4], "l_arm_angular.z": leap_action[5],
+            # Left hand
+            'l_hand_pinky': leap_action[6], 'l_hand_ring': leap_action[7], 'l_hand_middle': leap_action[8], 
+            'l_hand_index': leap_action[9], 'l_hand_thumb1': leap_action[10], 'l_hand_thumb2': leap_action[11],
+            # Right arm
+            "r_arm_linear.x": leap_action[12], "r_arm_linear.y": leap_action[13], "r_arm_linear.z": leap_action[14],
+            "r_arm_angular.x": leap_action[15], "r_arm_angular.y": leap_action[16], "r_arm_angular.z": leap_action[17],
+            # Right hand
+            'r_hand_pinky': leap_action[18], 'r_hand_ring': leap_action[19], 'r_hand_middle': leap_action[20], 
+            'r_hand_index': leap_action[21], 'r_hand_thumb1': leap_action[22], 'r_hand_thumb2': leap_action[23],
         }
 
         return action_dict

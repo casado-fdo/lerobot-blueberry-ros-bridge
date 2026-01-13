@@ -6,6 +6,11 @@ from lerobot.robots import RobotConfig
 from math import pi
 import os
 
+# Normalisation constants
+GEN3_INF_JOINT_POS_LIM = 2.97  # Approx 170 degrees
+GEN3_BIG_JOINT_EFFORT_LIM = 39.0  # Nm
+GEN3_SMALL_JOINT_EFFORT_LIM = 9.0  # Nm
+
 
 @RobotConfig.register_subclass("blueberry")
 @dataclass
@@ -67,14 +72,27 @@ class BlueberryROSConfig(RobotConfig):
 
 
     # Normalisation parameters
-    gen3_inf_joint_pos_lim = 2.97  # Approx 170 degrees, used to normalise joints 1,3,5,7 implemented as continuous/rotation hardware (-inf to +inf)
-    gen3_big_joint_effort_lim = 39.0  # Nm
-    gen3_small_joint_effort_lim = 9.0  # Nm
-    gen3_min_joint_positions: list[float] = [-gen3_inf_joint_pos_lim, -2.25, -gen3_inf_joint_pos_lim, -2.58, -gen3_inf_joint_pos_lim, 2.10, -gen3_inf_joint_pos_lim]
-    gen3_max_joint_positions: list[float] = [gen3_inf_joint_pos_lim, 2.25, gen3_inf_joint_pos_lim, 2.58, gen3_inf_joint_pos_lim, 2.10, gen3_inf_joint_pos_lim]
-    gen3_min_joint_efforts: list[float] = [-gen3_big_joint_effort_lim, -gen3_big_joint_effort_lim, -gen3_big_joint_effort_lim, -gen3_big_joint_effort_lim, -gen3_small_joint_effort_lim, -gen3_small_joint_effort_lim, -gen3_small_joint_effort_lim]
-    gen3_max_joint_efforts: list[float] = [gen3_big_joint_effort_lim, gen3_big_joint_effort_lim, gen3_big_joint_effort_lim, gen3_big_joint_effort_lim, gen3_small_joint_effort_lim, gen3_small_joint_effort_lim, gen3_small_joint_effort_lim]
-    inspire_hand_min_joint_position: float = [0.0] * 6
-    inspire_hand_max_joint_position: float = [1000.0] * 6
-    inspire_hand_min_joint_effort: float = [-500.0] * 6
-    inspire_hand_max_joint_effort: float = [2000.0] * 6
+    gen3_min_joint_positions: list[float] = field(
+        default_factory=lambda: [
+        -GEN3_INF_JOINT_POS_LIM, -2.25, -GEN3_INF_JOINT_POS_LIM, -2.58, -GEN3_INF_JOINT_POS_LIM, 2.10, -GEN3_INF_JOINT_POS_LIM
+        ]
+    )
+    gen3_max_joint_positions: list[float] = field(
+        default_factory=lambda: [
+            GEN3_INF_JOINT_POS_LIM, 2.25, GEN3_INF_JOINT_POS_LIM, 2.58, GEN3_INF_JOINT_POS_LIM, 2.10, GEN3_INF_JOINT_POS_LIM
+        ]
+    )
+    gen3_min_joint_efforts: list[float] = field(
+        default_factory=lambda: [
+            -GEN3_BIG_JOINT_EFFORT_LIM, -GEN3_BIG_JOINT_EFFORT_LIM, -GEN3_BIG_JOINT_EFFORT_LIM, -GEN3_BIG_JOINT_EFFORT_LIM, -GEN3_SMALL_JOINT_EFFORT_LIM, -GEN3_SMALL_JOINT_EFFORT_LIM, -GEN3_SMALL_JOINT_EFFORT_LIM
+        ]
+    )
+    gen3_max_joint_efforts: list[float] = field(
+        default_factory=lambda: [
+            GEN3_BIG_JOINT_EFFORT_LIM, GEN3_BIG_JOINT_EFFORT_LIM, GEN3_BIG_JOINT_EFFORT_LIM, GEN3_BIG_JOINT_EFFORT_LIM, GEN3_SMALL_JOINT_EFFORT_LIM, GEN3_SMALL_JOINT_EFFORT_LIM, GEN3_SMALL_JOINT_EFFORT_LIM
+        ]
+    )
+    inspire_hand_min_joint_position: float = field(default_factory=lambda: [0.0] * 6)
+    inspire_hand_max_joint_position: float = field(default_factory=lambda: [1000.0] * 6)
+    inspire_hand_min_joint_effort: float = field(default_factory=lambda: [-500.0] * 6)
+    inspire_hand_max_joint_effort: float = field(default_factory=lambda: [2000.0] * 6)

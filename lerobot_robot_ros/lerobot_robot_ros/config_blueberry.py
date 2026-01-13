@@ -17,8 +17,8 @@ class BlueberryROSConfig(RobotConfig):
         serial_number_or_name=os.getenv("LEFT_RS_SERIAL_NO"), 
         fps=int(os.getenv("RECORDING_FPS", "30")),
         warmup_s=0,
-        width=640,
-        height=480,
+        width=320,
+        height=240,
         color_mode=ColorMode.RGB,
         use_depth=False, # Depth is not supported yet by lerobot (TODO: add when available)
         rotation=Cv2Rotation.ROTATE_180
@@ -27,8 +27,8 @@ class BlueberryROSConfig(RobotConfig):
         serial_number_or_name=os.getenv("RIGHT_RS_SERIAL_NO"), 
         fps=int(os.getenv("RECORDING_FPS", "30")),
         warmup_s=0,
-        width=640,
-        height=480,
+        width=320,
+        height=240,
         color_mode=ColorMode.RGB,
         use_depth=False, # Depth is not supported yet by lerobot (TODO: add when available)
         rotation=Cv2Rotation.NO_ROTATION
@@ -64,3 +64,17 @@ class BlueberryROSConfig(RobotConfig):
     left_hand_teleop_topic: str = "/left_hand/lerobot/hand_angles"
     robot_joint_state_pos_topic: str = "/blueberry/joint_state/position"
     robot_joint_state_effort_topic: str = "/blueberry/joint_state/effort"
+
+
+    # Normalisation parameters
+    gen3_inf_joint_pos_lim = 2.97  # Approx 170 degrees, used to normalise joints 1,3,5,7 implemented as continuous/rotation hardware (-inf to +inf)
+    gen3_big_joint_effort_lim = 39.0  # Nm
+    gen3_small_joint_effort_lim = 9.0  # Nm
+    gen3_min_joint_positions: list[float] = [-gen3_inf_joint_pos_lim, -2.25, -gen3_inf_joint_pos_lim, -2.58, -gen3_inf_joint_pos_lim, 2.10, -gen3_inf_joint_pos_lim]
+    gen3_max_joint_positions: list[float] = [gen3_inf_joint_pos_lim, 2.25, gen3_inf_joint_pos_lim, 2.58, gen3_inf_joint_pos_lim, 2.10, gen3_inf_joint_pos_lim]
+    gen3_min_joint_efforts: list[float] = [-gen3_big_joint_effort_lim, -gen3_big_joint_effort_lim, -gen3_big_joint_effort_lim, -gen3_big_joint_effort_lim, -gen3_small_joint_effort_lim, -gen3_small_joint_effort_lim, -gen3_small_joint_effort_lim]
+    gen3_max_joint_efforts: list[float] = [gen3_big_joint_effort_lim, gen3_big_joint_effort_lim, gen3_big_joint_effort_lim, gen3_big_joint_effort_lim, gen3_small_joint_effort_lim, gen3_small_joint_effort_lim, gen3_small_joint_effort_lim]
+    inspire_hand_min_joint_position: float = [0.0] * 6
+    inspire_hand_max_joint_position: float = [1000.0] * 6
+    inspire_hand_min_joint_effort: float = [-500.0] * 6
+    inspire_hand_max_joint_effort: float = [2000.0] * 6

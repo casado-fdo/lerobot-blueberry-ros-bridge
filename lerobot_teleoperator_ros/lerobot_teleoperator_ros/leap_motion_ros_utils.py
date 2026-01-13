@@ -45,7 +45,7 @@ class LeapMotionROSInterface():
                          self.last_r_arm_vel_command.twist.angular.z]
         r_hand_positions = list(self.last_r_hand_pos_command.data)
 
-        # Reset the last commands after reading
+        # Reset the last arm commands after reading
         self.last_l_arm_vel_command = TwistStamped()
         self.last_r_arm_vel_command = TwistStamped()
 

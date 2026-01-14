@@ -76,9 +76,9 @@ def main():
 
     log_say("Starting recording loop...", play_sounds=PLAY_SOUNDS)
     episode_idx = dataset.num_episodes
-    NUM_EPISODES += dataset.num_episodes
-    while episode_idx < NUM_EPISODES and not events["stop_recording"]:
-        log_say(f"Recording episode {episode_idx + 1} out of {NUM_EPISODES}", play_sounds=PLAY_SOUNDS)
+    num_episodes = NUM_EPISODES + dataset.num_episodes
+    while episode_idx < num_episodes and not events["stop_recording"]:
+        log_say(f"Recording episode {episode_idx + 1} out of {num_episodes}", play_sounds=PLAY_SOUNDS)
 
         record_loop(
             robot=robot,
@@ -95,7 +95,7 @@ def main():
         )
 
         # Reset the environment if not stopping or re-recording
-        if not events["stop_recording"] and (episode_idx < NUM_EPISODES - 1 or events["rerecord_episode"]):
+        if not events["stop_recording"] and (episode_idx < num_episodes - 1 or events["rerecord_episode"]):
             log_say("Reset the environment", play_sounds=PLAY_SOUNDS)
             record_loop(
                 robot=robot,

@@ -21,116 +21,116 @@ HF_USERNAME = os.getenv("HUGGINGFACE_USERNAME", "your-username-here")
 HF_DATASET_NAME = os.getenv("HUGGINGFACE_DATASET_NAME", "default")
 HF_REPO_ID = f"{HF_USERNAME}/{HF_DATASET_NAME}"
 
-log_say("Initializing data collection...", play_sounds=True)
 
-# Create the robot and teleoperator configurations
-robot_config = BlueberryROSConfig() # default config
-teleop_config = LeapMotionROSTeleopConfig(
-    id="blueberry_leap_teleop",
-    left_arm_topic="/l_kinova_/leap_teleop/cartesian_velocity",
-    right_arm_topic="/r_kinova_/leap_teleop/cartesian_velocity",
-    left_hand_topic="/left_hand/leap_teleop/hand_angles",
-    right_hand_topic="/right_hand/leap_teleop/hand_angles",
-)
+def main():
+    log_say("Initialising data collection...", play_sounds=True)
 
-# Initialize the robot and teleoperator
-robot = BlueberryROS(robot_config)
-teleop = LeapMotionROSTeleop(teleop_config)
-
-teleop_action_processor, robot_action_processor, robot_observation_processor = make_default_processors()
-
-# Configure the dataset features
-action_features = hw_to_dataset_features(robot.action_features, ACTION)
-obs_features = hw_to_dataset_features(robot.observation_features, OBS_STR)
-dataset_features = {**action_features, **obs_features}
-
-# Debug
-#print("Robot observation features:", robot.observation_features)
-#print("Robot action features:", robot.action_features)
-
-folder_name = time.strftime("%Y%m%d-%H%M%S")
-
-# Pull existing dataset or create a new one
-try:
-    dataset = LeRobotDataset(repo_id=HF_REPO_ID)
-except:
-    log_say(f"Dataset {HF_REPO_ID} does not exist. Creating a new one.", play_sounds=False)
-    dataset = LeRobotDataset.create(
-        repo_id=HF_REPO_ID,
-        root=folder_name,
-        fps=FPS,
-        features=dataset_features,
-        robot_type=robot.name,
-        use_videos=True,
-        image_writer_threads=4,
+    # Create the robot and teleoperator configurations
+    robot_config = BlueberryROSConfig() # default config
+    teleop_config = LeapMotionROSTeleopConfig(
+        id="blueberry_leap_teleop",
+        left_arm_topic="/l_kinova_/leap_teleop/cartesian_velocity",
+        right_arm_topic="/r_kinova_/leap_teleop/cartesian_velocity",
+        left_hand_topic="/left_hand/leap_teleop/hand_angles",
+        right_hand_topic="/right_hand/leap_teleop/hand_angles",
     )
 
-# Connect the robot and teleoperator
-robot.connect()
-teleop.connect()
+    # Initialize the robot and teleoperator
+    robot = BlueberryROS(robot_config)
+    teleop = LeapMotionROSTeleop(teleop_config)
 
-# Initialize the keyboard listener and rerun visualization
-listener, events = init_keyboard_listener()
-# init_rerun(session_name="blueberry_recording")
+    teleop_action_processor, robot_action_processor, robot_observation_processor = make_default_processors()
 
-if not robot.is_connected or not teleop.is_connected:
-    raise ValueError("Robot or teleop is not connected!")
+    # Configure the dataset features
+    action_features = hw_to_dataset_features(robot.action_features, ACTION)
+    obs_features = hw_to_dataset_features(robot.observation_features, OBS_STR)
+    dataset_features = {**action_features, **obs_features}
 
-log_say("Starting recording loop...", play_sounds=PLAY_SOUNDS)
-episode_idx = dataset.num_episodes
-NUM_EPISODES += dataset.num_episodes
-while episode_idx < NUM_EPISODES and not events["stop_recording"]:
-    log_say(f"Recording episode {episode_idx + 1} out of {NUM_EPISODES}", play_sounds=PLAY_SOUNDS)
+    folder_name = time.strftime("%Y%m%d-%H%M%S")
 
-    record_loop(
-        robot=robot,
-        events=events,
-        fps=FPS,
-        teleop=teleop,
-        dataset=dataset,
-        teleop_action_processor=teleop_action_processor,
-        robot_action_processor=robot_action_processor,
-        robot_observation_processor=robot_observation_processor,
-        control_time_s=EPISODE_TIME_SEC,
-        single_task=TASK_DESCRIPTION,
-        display_data=True,
-    )
+    # Pull existing dataset or create a new one
+    try:
+        dataset = LeRobotDataset(repo_id=HF_REPO_ID)
+    except:
+        log_say(f"Dataset {HF_REPO_ID} does not exist. Creating a new one.", play_sounds=False)
+        dataset = LeRobotDataset.create(
+            repo_id=HF_REPO_ID,
+            root=folder_name,
+            fps=FPS,
+            features=dataset_features,
+            robot_type=robot.name,
+            use_videos=True,
+            image_writer_threads=4,
+        )
 
-    # Reset the environment if not stopping or re-recording
-    if not events["stop_recording"] and (episode_idx < NUM_EPISODES - 1 or events["rerecord_episode"]):
-        log_say("Reset the environment", play_sounds=PLAY_SOUNDS)
+    # Connect the robot and teleoperator
+    robot.connect()
+    teleop.connect()
+
+    # Initialize the keyboard listener and rerun visualization
+    listener, events = init_keyboard_listener()
+    # init_rerun(session_name="blueberry_recording")
+
+    if not robot.is_connected or not teleop.is_connected:
+        raise ValueError("Robot or teleop is not connected!")
+
+    log_say("Starting recording loop...", play_sounds=PLAY_SOUNDS)
+    episode_idx = dataset.num_episodes
+    NUM_EPISODES += dataset.num_episodes
+    while episode_idx < NUM_EPISODES and not events["stop_recording"]:
+        log_say(f"Recording episode {episode_idx + 1} out of {NUM_EPISODES}", play_sounds=PLAY_SOUNDS)
+
         record_loop(
             robot=robot,
             events=events,
             fps=FPS,
             teleop=teleop,
-            dataset=None,
+            dataset=dataset,
             teleop_action_processor=teleop_action_processor,
             robot_action_processor=robot_action_processor,
             robot_observation_processor=robot_observation_processor,
-            control_time_s=RESET_TIME_SEC,
+            control_time_s=EPISODE_TIME_SEC,
             single_task=TASK_DESCRIPTION,
             display_data=True,
         )
 
-    if events["rerecord_episode"]:
-        log_say("Re-recording episode", play_sounds=PLAY_SOUNDS)
-        events["rerecord_episode"] = False
-        events["exit_early"] = False
-        dataset.clear_episode_buffer()
-        continue
+        # Reset the environment if not stopping or re-recording
+        if not events["stop_recording"] and (episode_idx < NUM_EPISODES - 1 or events["rerecord_episode"]):
+            log_say("Reset the environment", play_sounds=PLAY_SOUNDS)
+            record_loop(
+                robot=robot,
+                events=events,
+                fps=FPS,
+                teleop=teleop,
+                dataset=None,
+                teleop_action_processor=teleop_action_processor,
+                robot_action_processor=robot_action_processor,
+                robot_observation_processor=robot_observation_processor,
+                control_time_s=RESET_TIME_SEC,
+                single_task=TASK_DESCRIPTION,
+                display_data=True,
+            )
 
-    dataset.save_episode()
-    episode_idx += 1
+        if events["rerecord_episode"]:
+            log_say("Re-recording episode", play_sounds=PLAY_SOUNDS)
+            events["rerecord_episode"] = False
+            events["exit_early"] = False
+            dataset.clear_episode_buffer()
+            continue
 
-# Clean up
-log_say("Stop recording", play_sounds=PLAY_SOUNDS)
-robot.disconnect()
-teleop.disconnect()
-listener.stop()
+        dataset.save_episode()
+        episode_idx += 1
 
-dataset.finalize()
-dataset.push_to_hub()
+    # Clean up
+    log_say("Stop recording", play_sounds=PLAY_SOUNDS)
+    robot.disconnect()
+    teleop.disconnect()
+    listener.stop()
+
+    dataset.finalize()
+    dataset.push_to_hub()
 
 
+if __name__ == "__main__":
+    main()
 

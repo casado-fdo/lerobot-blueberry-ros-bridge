@@ -3,12 +3,7 @@
 import time
 
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
-from lerobot.model.kinematics import RobotKinematics
 from lerobot.processor import RobotAction, RobotObservation, RobotProcessorPipeline
-from lerobot.processor.converters import (
-    robot_action_observation_to_transition,
-    transition_to_robot_action,
-)
 from lerobot.utils.constants import ACTION
 from lerobot.utils.robot_utils import precise_sleep
 from utils import log_say
@@ -22,7 +17,7 @@ def main(hf_dataset_name: str, episode_idx: int):
     log_say("Initialising episode replay...", play_sounds=False)
 
 
-    HF_REPO_ID = f"{HF_USERNAME}/{hf_dataset_name}"
+    hf_repo_id = f"{HF_USERNAME}/{hf_dataset_name}"
 
     # Initialize the robot config
     robot_config = BlueberryROSConfig() # default config
@@ -31,7 +26,7 @@ def main(hf_dataset_name: str, episode_idx: int):
     robot = BlueberryROS(robot_config)
 
     # Fetch the dataset to replay
-    dataset = LeRobotDataset(HF_REPO_ID, episodes=[episode_idx])
+    dataset = LeRobotDataset(hf_repo_id, episodes=[episode_idx])
     # Filter dataset to only include frames from the specified episode since episodes are chunked in dataset V3.0
     episode_frames = dataset.hf_dataset.filter(lambda x: x["episode_index"] == episode_idx)
     actions = episode_frames.select_columns(ACTION)

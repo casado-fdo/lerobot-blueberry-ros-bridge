@@ -28,7 +28,7 @@ start:
 		-v ${XDG_RUNTIME_DIR}/pulse:${XDG_RUNTIME_DIR}/pulse \
 		-v ${XSOCK}:${XSOCK} \
 		-v ${XAUTH}:${XAUTH} \
-		-v ./data:/data/models/huggingface/lerobot \
+		-v ./data:/data \
 		-v ./lerobot_robot_ros:/workspace/lerobot_robot_ros \
 		-v ./lerobot_teleoperator_ros:/workspace/lerobot_teleoperator_ros \
 		-v ./scripts:/workspace/scripts \

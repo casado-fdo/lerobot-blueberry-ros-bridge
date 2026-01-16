@@ -7,6 +7,8 @@ from lerobot.processor import RobotAction, RobotObservation, RobotProcessorPipel
 from lerobot.utils.constants import ACTION
 from lerobot.utils.robot_utils import precise_sleep
 from lerobot.policies.act.modeling_act import ACTPolicy
+from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
+from lerobot.policies.xvla.modeling_xvla import XVLAPolicy
 from lerobot.policies.factory import make_pre_post_processors
 from lerobot_robot_ros import BlueberryROS, BlueberryROSConfig
 from lerobot.utils.control_utils import init_keyboard_listener
@@ -24,7 +26,7 @@ PLAY_SOUNDS = bool(os.getenv("RECORDING_PLAY_SOUNDS", "True").lower() in ("true"
 HF_USERNAME = os.getenv("HUGGINGFACE_USERNAME", "your-username-here")
 #HF_DATASET_NAME = os.getenv("HUGGINGFACE_DATASET_NAME", "default")
 
-def main(hf_policy_id: str, hf_dataset_id: str):
+def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act"):
     log_say("Initialising policy evaluation...", play_sounds=False)
 
     hf_policy_repo_id = f"{HF_USERNAME}/{hf_policy_id}"
@@ -40,7 +42,14 @@ def main(hf_policy_id: str, hf_dataset_id: str):
 
 
     # Create policy
-    policy = ACTPolicy.from_pretrained(hf_policy_repo_id)
+    if policy_type.lower() == "act":
+        policy = ACTPolicy.from_pretrained(hf_policy_repo_id)
+    elif policy_type.lower() == "smolvla":
+        policy = SmolVLAPolicy.from_pretrained(hf_policy_repo_id)
+    elif policy_type.lower() == "xvla":
+        policy = XVLAPolicy.from_pretrained(hf_policy_repo_id)
+    else:
+        raise ValueError(f"Unsupported policy type: {policy_type}")
 
     # Fetch the dataset for stats
     dataset = LeRobotDataset(hf_dataset_repo_id)
@@ -125,5 +134,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--policy_id", type=str, required=True, help="HuggingFace policy name to evaluate")
     parser.add_argument("--dataset_id", type=str, required=False, help="HuggingFace dataset name to use for stats")
+    parser.add_argument("--policy_type", type=str, default="act", help="Type of policy to evaluate (default: act)")
     args = parser.parse_args()
-    main(args.policy_id, args.dataset_id)
+    main(args.policy_id, args.dataset_id, args.policy_type)

@@ -52,6 +52,9 @@ RUN make -j$(($(nproc)-1))
 RUN make install
 RUN cp ../config/99-realsense-libusb.rules /etc/udev/rules.d/
 
+# Install some extra packages for specific policies like SmolVLA
+RUN pip install num2words
+
 # Install rospypi to interface with ROS Noetic
 RUN pip install --extra-index-url https://rospypi.github.io/simple/ rospy-all
 

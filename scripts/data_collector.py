@@ -101,7 +101,7 @@ def main():
                 robot=robot,
                 events=events,
                 fps=FPS,
-                teleop=teleop,
+                teleop=None,
                 dataset=None,
                 teleop_action_processor=teleop_action_processor,
                 robot_action_processor=robot_action_processor,

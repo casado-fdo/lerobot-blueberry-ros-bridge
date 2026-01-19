@@ -27,7 +27,7 @@ HF_USERNAME = os.getenv("HUGGINGFACE_USERNAME", "your-username-here")
 #HF_DATASET_NAME = os.getenv("HUGGINGFACE_DATASET_NAME", "default")
 
 def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act"):
-    log_say("Initialising policy evaluation...", play_sounds=False)
+    log_say("Initialising policy evaluation...", play_sounds=PLAY_SOUNDS)
 
     hf_policy_repo_id = f"{HF_USERNAME}/{hf_policy_id}"
     hf_dataset_repo_id = f"{HF_USERNAME}/{hf_dataset_id}"
@@ -74,8 +74,8 @@ def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act")
         
     print("Starting evaluate loop...")
     episode_idx = 0
-    for episode_idx in range(NUM_EPISODES):
-        log_say(f"Running inference, recording eval episode {episode_idx + 1} of {NUM_EPISODES}")
+    while episode_idx < NUM_EPISODES and not events["stop_recording"]:
+        log_say(f"Running inference, recording eval episode {episode_idx + 1} of {NUM_EPISODES}", play_sounds=PLAY_SOUNDS)
 
         # Main record loop
         record_loop(
@@ -96,12 +96,12 @@ def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act")
 
         # Reset the environment if not stopping or re-recording
         if not events["stop_recording"] and ((episode_idx < NUM_EPISODES - 1) or events["rerecord_episode"]):
-            log_say("Reset the environment")
+            log_say("Reset the environment", play_sounds=PLAY_SOUNDS)
             record_loop(
                 robot=robot,
                 events=events,
                 fps=FPS,
-                control_time_s=EPISODE_TIME_SEC,
+                control_time_s=RESET_TIME_SEC,
                 single_task=TASK_DESCRIPTION,
                 display_data=True,
                 teleop_action_processor=teleop_action_processor,
@@ -110,7 +110,7 @@ def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act")
             )
 
         if events["rerecord_episode"]:
-            log_say("Re-record episode")
+            log_say("Re-record episode", play_sounds=PLAY_SOUNDS)
             events["rerecord_episode"] = False
             events["exit_early"] = False
             dataset.clear_episode_buffer()
@@ -121,7 +121,7 @@ def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act")
         episode_idx += 1
 
     # Clean up
-    log_say("Stop recording")
+    log_say("Stop recording", play_sounds=PLAY_SOUNDS)
     robot.disconnect()
     listener.stop()
 

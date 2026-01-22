@@ -7,8 +7,10 @@ from lerobot.utils.visualization_utils import init_rerun
 from lerobot.scripts.lerobot_record import record_loop
 from lerobot.processor import make_default_processors
 from lerobot.utils.constants import ACTION, OBS_STR
+from lerobot.configs.types import PolicyFeature, FeatureType
 from utils import log_say
 import time, os
+import rerun as rr
 
 
 NUM_EPISODES = int(os.getenv("RECORDING_NUM_EPISODES", "1"))
@@ -17,6 +19,9 @@ EPISODE_TIME_SEC = int(os.getenv("RECORDING_EPISODE_TIME_SEC", "10"))
 RESET_TIME_SEC = int(os.getenv("RECORDING_RESET_TIME_SEC", "5"))
 TASK_DESCRIPTION = os.getenv("RECORDING_TASK_DESCRIPTION", "No task description provided.")
 PLAY_SOUNDS = bool(os.getenv("RECORDING_PLAY_SOUNDS", "True").lower() in ("true", "1", "yes"))
+ENABLE_RERUN = bool(os.getenv("RECORDING_ENABLE_RERUN", "False").lower() in ("true", "1", "yes"))
+RERUN_IP = os.getenv("RERUN_IP", "127.0.0.1")
+RERUN_PORT = int(os.getenv("RERUN_PORT", "9876"))
 HF_USERNAME = os.getenv("HUGGINGFACE_USERNAME", "your-username-here")
 HF_DATASET_NAME = os.getenv("HUGGINGFACE_DATASET_NAME", "default")
 HF_REPO_ID = f"{HF_USERNAME}/{HF_DATASET_NAME}"
@@ -60,7 +65,8 @@ def main():
             features=dataset_features,
             robot_type=robot.name,
             use_videos=True,
-            image_writer_threads=4,
+            image_writer_processes=2,
+            image_writer_threads=10,
         )
 
     # Connect the robot and teleoperator
@@ -69,7 +75,8 @@ def main():
 
     # Initialize the keyboard listener and rerun visualization
     listener, events = init_keyboard_listener()
-    # init_rerun(session_name="blueberry_recording")
+    if ENABLE_RERUN:
+        init_rerun(session_name="blueberry_recording", ip=RERUN_IP, port=RERUN_PORT)
 
     if not robot.is_connected or not teleop.is_connected:
         raise ValueError("Robot or teleop is not connected!")
@@ -91,7 +98,8 @@ def main():
             robot_observation_processor=robot_observation_processor,
             control_time_s=EPISODE_TIME_SEC,
             single_task=TASK_DESCRIPTION,
-            display_data=True,
+            display_data=ENABLE_RERUN,
+            #display_compressed_images=True,
         )
 
         # Reset the environment if not stopping or re-recording
@@ -108,7 +116,7 @@ def main():
                 robot_observation_processor=robot_observation_processor,
                 control_time_s=RESET_TIME_SEC,
                 single_task=TASK_DESCRIPTION,
-                display_data=True,
+                display_data=False,
             )
 
         if events["rerecord_episode"]:

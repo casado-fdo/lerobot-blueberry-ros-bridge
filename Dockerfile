@@ -64,6 +64,10 @@ WORKDIR /workspace
 # Create data directory
 RUN mkdir -p data
 
+# Upgrade lerobot sources to the latest available version
+RUN git clone https://github.com/huggingface/lerobot.git
+RUN cp -r ./lerobot/* /opt/lerobot/
+
 # Copy lerobot custom HW packages
 COPY lerobot_robot_ros /workspace/lerobot_robot_ros/
 COPY lerobot_teleoperator_ros /workspace/lerobot_teleoperator_ros/

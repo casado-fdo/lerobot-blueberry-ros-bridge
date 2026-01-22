@@ -6,7 +6,7 @@ from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.processor import RobotAction, RobotObservation, RobotProcessorPipeline, make_default_processors
 from lerobot.utils.constants import ACTION
 from lerobot.utils.robot_utils import precise_sleep
-from lerobot.policies.act.modeling_act import ACTPolicy
+from lerobot.policies.act.modeling_act import ACTPolicy, ACTTemporalEnsembler
 from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
 from lerobot.policies.xvla.modeling_xvla import XVLAPolicy
 from lerobot.policies.factory import make_pre_post_processors
@@ -54,6 +54,11 @@ def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act")
     # Fetch the dataset for stats
     dataset = LeRobotDataset(hf_dataset_repo_id)
 
+    # Change some parameters in the policy config
+    policy.config.temporal_ensemble_coeff=0.01
+    policy.temporal_ensembler=ACTTemporalEnsembler(policy.config.temporal_ensemble_coeff, policy.config.chunk_size)
+    policy.config.n_action_steps=1 #min(policy.config.chunk_size, 25)
+
     # Build Policy Processors
     preprocessor, postprocessor = make_pre_post_processors(
         policy_cfg=policy,
@@ -72,10 +77,9 @@ def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act")
     if not robot.is_connected:
         raise ValueError("Robot is not connected!")
         
-    print("Starting evaluate loop...")
     episode_idx = 0
     while episode_idx < NUM_EPISODES and not events["stop_recording"]:
-        log_say(f"Running inference, recording eval episode {episode_idx + 1} of {NUM_EPISODES}", play_sounds=PLAY_SOUNDS)
+        log_say(f"Running inference, episode {episode_idx + 1} of {NUM_EPISODES}", play_sounds=PLAY_SOUNDS)
 
         # Main record loop
         record_loop(
@@ -110,7 +114,7 @@ def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act")
             )
 
         if events["rerecord_episode"]:
-            log_say("Re-record episode", play_sounds=PLAY_SOUNDS)
+            log_say("Re-run episode", play_sounds=PLAY_SOUNDS)
             events["rerecord_episode"] = False
             events["exit_early"] = False
             dataset.clear_episode_buffer()

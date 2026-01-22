@@ -22,8 +22,8 @@ class BlueberryROSConfig(RobotConfig):
         serial_number_or_name=os.getenv("LEFT_RS_SERIAL_NO"), 
         fps=int(os.getenv("RECORDING_FPS", "30")),
         warmup_s=0,
-        width=320,
-        height=240,
+        width=320,  # 1280, 960, 640, 320
+        height=240, #  720, 540, 480, 240
         color_mode=ColorMode.RGB,
         use_depth=False, # Depth is not supported yet by lerobot (TODO: add when available)
         rotation=Cv2Rotation.ROTATE_180
@@ -32,8 +32,8 @@ class BlueberryROSConfig(RobotConfig):
         serial_number_or_name=os.getenv("RIGHT_RS_SERIAL_NO"), 
         fps=int(os.getenv("RECORDING_FPS", "30")),
         warmup_s=0,
-        width=320,
-        height=240,
+        width=320,  # 1280, 960, 640, 320
+        height=240, #  720, 540, 480, 240
         color_mode=ColorMode.RGB,
         use_depth=False, # Depth is not supported yet by lerobot (TODO: add when available)
         rotation=Cv2Rotation.NO_ROTATION

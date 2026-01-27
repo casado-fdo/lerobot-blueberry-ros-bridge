@@ -1,7 +1,10 @@
 from dataclasses import dataclass, field
 
 from lerobot.cameras.realsense.configuration_realsense import RealSenseCameraConfig
-from lerobot.cameras.configs import ColorMode, Cv2Rotation
+from lerobot.cameras.opencv.camera_opencv import OpenCVCamera
+from lerobot.cameras.opencv.configuration_opencv import OpenCVCameraConfig
+from lerobot.cameras.configs import ColorMode, Cv2Rotation, CameraConfig
+from .config_pl_neon_camera import PLNeonCameraConfig
 from lerobot.robots import RobotConfig
 from math import pi
 import os
@@ -38,10 +41,18 @@ class BlueberryROSConfig(RobotConfig):
         use_depth=False, # Depth is not supported yet by lerobot (TODO: add when available)
         rotation=Cv2Rotation.NO_ROTATION
     )
-    cameras: dict[str, RealSenseCameraConfig] = field(
+    user_camera_config = PLNeonCameraConfig(
+        index_or_path='/dev/video20',
+        fps=int(os.getenv("RECORDING_FPS", "30")),
+        width=320, 
+        height=240,
+        color_mode=ColorMode.RGB,
+    )
+    cameras: dict[str, CameraConfig] = field(
         default_factory=lambda: {
             "left": BlueberryROSConfig.left_camera_config, 
-            "right": BlueberryROSConfig.right_camera_config
+            "right": BlueberryROSConfig.right_camera_config,
+            "user": BlueberryROSConfig.user_camera_config,
         })
     
     

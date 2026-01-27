@@ -66,7 +66,7 @@ def main():
             robot_type=robot.name,
             use_videos=True,
             image_writer_processes=2,
-            image_writer_threads=10,
+            image_writer_threads=6,
         )
 
     # Connect the robot and teleoperator

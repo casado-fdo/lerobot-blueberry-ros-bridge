@@ -68,6 +68,18 @@ RUN mkdir -p data
 RUN git clone https://github.com/huggingface/lerobot.git
 RUN cp -r ./lerobot/* /opt/lerobot/
 
+# Install Pupil Labs eye-tracking glasses dependencies
+RUN pip install pupil-labs-realtime-api 
+RUN apt-get update && apt-get install -y \
+    libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-libav \
+    gstreamer1.0-tools
+RUN apt install -y v4l2loopback-dkms v4l-utils
+
 # Copy lerobot custom HW packages
 COPY lerobot_robot_ros /workspace/lerobot_robot_ros/
 COPY lerobot_teleoperator_ros /workspace/lerobot_teleoperator_ros/

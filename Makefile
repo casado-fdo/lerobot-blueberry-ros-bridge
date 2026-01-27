@@ -33,6 +33,7 @@ start:
 		-v ./lerobot_teleoperator_ros:/workspace/lerobot_teleoperator_ros \
 		-v ./scripts:/workspace/scripts \
 		-v /dev:/dev \
+		-v /tmp/argus_socket:/tmp/argus_socket \
 		--net host \
 		--gpus all \
 		--runtime nvidia \
@@ -41,7 +42,7 @@ start:
 
 record: .start_if_not_running
 	docker exec -it lerobot \
-		bash -c "hf auth login --token ${HUGGINGFACE_HUB_TOKEN} && python3 scripts/data_collector.py"
+		bash -c "hf auth login --token ${HUGGINGFACE_HUB_TOKEN} && python3 scripts/pl_neon_to_v4l2_streamer.py & python3 scripts/data_collector.py"
 
 debug: .start_if_not_running
 	docker exec -it lerobot bash

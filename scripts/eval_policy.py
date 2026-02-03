@@ -107,7 +107,7 @@ def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act")
                 fps=FPS,
                 control_time_s=RESET_TIME_SEC,
                 single_task=TASK_DESCRIPTION,
-                display_data=True,
+                display_data=False,
                 teleop_action_processor=teleop_action_processor,
                 robot_action_processor=robot_action_processor,
                 robot_observation_processor=robot_observation_processor,
@@ -120,17 +120,12 @@ def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act")
             dataset.clear_episode_buffer()
             continue
 
-        # Save episode
-        #dataset.save_episode()
         episode_idx += 1
 
     # Clean up
     log_say("Stop recording", play_sounds=PLAY_SOUNDS)
     robot.disconnect()
     listener.stop()
-
-    #dataset.finalize()
-    #dataset.push_to_hub()
 
 
 

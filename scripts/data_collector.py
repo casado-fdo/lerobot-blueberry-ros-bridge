@@ -65,8 +65,8 @@ def main():
             features=dataset_features,
             robot_type=robot.name,
             use_videos=True,
-            image_writer_processes=2,
-            image_writer_threads=6,
+            image_writer_processes=3,
+            image_writer_threads=5,
         )
 
     # Connect the robot and teleoperator

@@ -34,6 +34,7 @@ start:
 		-v ./scripts:/workspace/scripts \
 		-v /dev:/dev \
 		-v /tmp/argus_socket:/tmp/argus_socket \
+		-v /home/${USER}/.cache/at-spi:/home/${USER}/.cache/at-spi \
 		--net host \
 		--gpus all \
 		--runtime nvidia \

@@ -1,4 +1,5 @@
 import cv2
+import os
 import numpy as np
 from pupil_labs.realtime_api.simple import discover_one_device
 
@@ -13,14 +14,22 @@ def main():
 
     print(f"Connecting to {device}...")
 
-    fps = 30
+    fps = int(os.getenv("RECORDING_FPS", "30"))
     raw_width, raw_height = 1600, 1200  # native Neon resolution
-    target_width, target_height = 320, 240 # desired output resolution
-    crop_factor = 0.4 # crop to top-center 80% of the image
-    crop_x1 = int(raw_width * crop_factor / 2)
-    crop_x2 = int(raw_width * (1 - crop_factor / 2))
-    crop_y1 = 0
-    crop_y2 = int(raw_height * (1 - crop_factor))
+    target_width = int(os.getenv("RECORDING_VIDEO_WIDTH", "320"))
+    target_height = int(os.getenv("RECORDING_VIDEO_HEIGHT", "240"))
+    crop_keep_ratio = 0.4 # How much of the image to keep (0-1)
+    vertical_offset_ratio = 0.2 # Vertical bias (0 = very top, 0.5 = centre)
+
+    # Compute crop coordinates
+    crop_width = int(raw_width * crop_keep_ratio)
+    crop_height = int(raw_height * crop_keep_ratio)
+    crop_x1 = (raw_width - crop_width) // 2
+    crop_x2 = crop_x1 + crop_width
+    crop_y1 = int(raw_height * vertical_offset_ratio)
+    crop_y2 = crop_y1 + crop_height
+    crop_y2 = min(crop_y2, raw_height) # Safety clamp (just in case)
+
 
     gst_str = ("appsrc ! videoconvert ! v4l2sink device=/dev/video20 sync=false")
     out = cv2.VideoWriter(gst_str, 

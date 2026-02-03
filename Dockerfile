@@ -61,9 +61,6 @@ RUN pip install --extra-index-url https://rospypi.github.io/simple/ rospy-all
 # Set up workspace
 WORKDIR /workspace
 
-# Create data directory
-RUN mkdir -p data
-
 # Upgrade lerobot sources to the latest available version
 RUN git clone https://github.com/huggingface/lerobot.git
 RUN cp -r ./lerobot/* /opt/lerobot/

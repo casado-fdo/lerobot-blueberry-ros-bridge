@@ -1,6 +1,7 @@
 import cv2
 import os
 import numpy as np
+import time
 from pupil_labs.realtime_api.simple import discover_one_device
 
 
@@ -14,7 +15,7 @@ def main():
 
     print(f"Connecting to {device}...")
 
-    fps = int(os.getenv("RECORDING_FPS", "30"))
+    fps = int(os.getenv("RECORDING_FPS", "15"))
     raw_width, raw_height = 1600, 1200  # native Neon resolution
     target_width = int(os.getenv("RECORDING_VIDEO_WIDTH", "320"))
     target_height = int(os.getenv("RECORDING_VIDEO_HEIGHT", "240"))
@@ -45,28 +46,37 @@ def main():
 
     cv2.setNumThreads(1)
 
+    frame_interval = 1.0 / fps  # Time between frames in seconds
+    last_frame_time = time.time()
+
     try:
         while True:
-            # Get the next video frame and gaze data
-            frame, gaze = device.receive_matched_scene_video_frame_and_gaze()
+            current_time = time.time()
             
-            # Draw gaze on the frame
-            cv2.circle(
-                frame.bgr_pixels,
-                (int(gaze.x), int(gaze.y)),
-                radius=80,
-                color=(0, 0, 255),
-                thickness=15,
-            )
+            # Only process frame if enough time has passed
+            if current_time - last_frame_time >= frame_interval:
+                # Get the next video frame and gaze data
+                frame, gaze = device.receive_matched_scene_video_frame_and_gaze()
+                
+                # Draw gaze on the frame
+                cv2.circle(
+                    frame.bgr_pixels,
+                    (int(gaze.x), int(gaze.y)),
+                    radius=45,
+                    color=(0, 0, 255),
+                    thickness=8,
+                )
 
-            # Crop to central region
-            final_frame = frame.bgr_pixels[crop_y1:crop_y2, crop_x1:crop_x2]
-            
-            # Resize frame to target resolution
-            final_frame = cv2.resize(final_frame, (target_width, target_height), interpolation=cv2.INTER_LINEAR)
-            
-            # Write to sink
-            out.write(final_frame)
+                # Crop to central region
+                final_frame = frame.bgr_pixels[crop_y1:crop_y2, crop_x1:crop_x2]
+                
+                # Resize frame to target resolution
+                final_frame = cv2.resize(final_frame, (target_width, target_height), interpolation=cv2.INTER_LINEAR)
+                
+                # Write to sink
+                out.write(final_frame)
+                
+                last_frame_time = current_time
             
             if cv2.waitKey(1) & 0xFF == 27:
                 break

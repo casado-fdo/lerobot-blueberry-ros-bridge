@@ -20,32 +20,37 @@ GEN3_SMALL_JOINT_EFFORT_LIM = 9.0  # Nm
 class BlueberryROSConfig(RobotConfig):
     """Configuration for Blueberry robot."""
 
+    cam_width = int(os.getenv("RECORDING_VIDEO_WIDTH", "320")) # 1280, 960, 640, 320
+    cam_height = int(os.getenv("RECORDING_VIDEO_HEIGHT", "240")) #  720, 540, 480, 240
+    cam_fps = int(os.getenv("RECORDING_FPS", "15"))
+    rs_fps = 30 if cam_width == 320 else cam_fps # The realsense can only run at 5, 30 or 60 fps in 320x240 resolution
+
     # Cameras configuration
     left_camera_config = RealSenseCameraConfig(
         serial_number_or_name=os.getenv("LEFT_RS_SERIAL_NO"), 
-        fps=30,
+        fps=rs_fps,
         warmup_s=0,
-        width=int(os.getenv("RECORDING_VIDEO_WIDTH", "320")),  # 1280, 960, 640, 320
-        height=int(os.getenv("RECORDING_VIDEO_HEIGHT", "240")), #  720, 540, 480, 240
+        width=cam_width,
+        height=cam_height,
         color_mode=ColorMode.RGB,
         use_depth=False, # Depth is not supported yet by lerobot (TODO: add when available)
         rotation=Cv2Rotation.ROTATE_180
     )
     right_camera_config = RealSenseCameraConfig(
         serial_number_or_name=os.getenv("RIGHT_RS_SERIAL_NO"), 
-        fps=30,
+        fps=rs_fps,
         warmup_s=0,
-        width=int(os.getenv("RECORDING_VIDEO_WIDTH", "320")),  # 1280, 960, 640, 320
-        height=int(os.getenv("RECORDING_VIDEO_HEIGHT", "240")), #  720, 540, 480, 240
+        width=cam_width,
+        height=cam_height,
         color_mode=ColorMode.RGB,
         use_depth=False, # Depth is not supported yet by lerobot (TODO: add when available)
         rotation=Cv2Rotation.NO_ROTATION
     )
     user_camera_config = PLNeonCameraConfig(
         index_or_path='/dev/video20',
-        fps=int(os.getenv("RECORDING_FPS", "30")),
-        width=int(os.getenv("RECORDING_VIDEO_WIDTH", "320")),  
-        height=int(os.getenv("RECORDING_VIDEO_HEIGHT", "240")),
+        fps=cam_fps,
+        width=cam_width,  
+        height=cam_height,
         color_mode=ColorMode.RGB,
     )
     cameras: dict[str, CameraConfig] = field(

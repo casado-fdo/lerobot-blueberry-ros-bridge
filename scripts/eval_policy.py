@@ -55,9 +55,9 @@ def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act")
     dataset = LeRobotDataset(hf_dataset_repo_id)
 
     # Change some parameters in the policy config
-    policy.config.temporal_ensemble_coeff=0.01
-    policy.temporal_ensembler=ACTTemporalEnsembler(policy.config.temporal_ensemble_coeff, policy.config.chunk_size)
-    policy.config.n_action_steps=1 #min(policy.config.chunk_size, 25)
+    #policy.config.temporal_ensemble_coeff=0.01
+    #policy.temporal_ensembler=ACTTemporalEnsembler(policy.config.temporal_ensemble_coeff, policy.config.chunk_size)
+    #policy.config.n_action_steps=1 #min(policy.config.chunk_size, 25)
 
     # Build Policy Processors
     preprocessor, postprocessor = make_pre_post_processors(

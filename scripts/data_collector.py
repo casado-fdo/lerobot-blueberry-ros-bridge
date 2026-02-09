@@ -11,7 +11,7 @@ from lerobot.configs.types import PolicyFeature, FeatureType
 from utils import log_say
 import time, os
 import rerun as rr
-
+import traceback
 
 NUM_EPISODES = int(os.getenv("RECORDING_NUM_EPISODES", "1"))
 FPS = int(os.getenv("RECORDING_FPS", "30"))
@@ -83,60 +83,66 @@ def main():
 
     log_say("Starting recording loop...", play_sounds=PLAY_SOUNDS)
     episode_idx = dataset.num_episodes
-    num_episodes = NUM_EPISODES + dataset.num_episodes
-    while episode_idx < num_episodes and not events["stop_recording"]:
-        log_say(f"Recording episode {episode_idx + 1} out of {num_episodes}", play_sounds=PLAY_SOUNDS)
+    num_episodes = NUM_EPISODES + episode_idx
+    try:
+        while episode_idx < num_episodes and not events["stop_recording"]:
+            log_say(f"Recording episode {episode_idx + 1} out of {num_episodes}", play_sounds=PLAY_SOUNDS)
 
-        record_loop(
-            robot=robot,
-            events=events,
-            fps=FPS,
-            teleop=teleop,
-            dataset=dataset,
-            teleop_action_processor=teleop_action_processor,
-            robot_action_processor=robot_action_processor,
-            robot_observation_processor=robot_observation_processor,
-            control_time_s=EPISODE_TIME_SEC,
-            single_task=TASK_DESCRIPTION,
-            display_data=ENABLE_RERUN,
-            #display_compressed_images=True,
-        )
-
-        # Reset the environment if not stopping or re-recording
-        if not events["stop_recording"] and (episode_idx < num_episodes - 1 or events["rerecord_episode"]):
-            log_say("Reset the environment", play_sounds=PLAY_SOUNDS)
             record_loop(
                 robot=robot,
                 events=events,
                 fps=FPS,
-                teleop=None,
-                dataset=None,
+                teleop=teleop,
+                dataset=dataset,
                 teleop_action_processor=teleop_action_processor,
                 robot_action_processor=robot_action_processor,
                 robot_observation_processor=robot_observation_processor,
-                control_time_s=RESET_TIME_SEC,
+                control_time_s=EPISODE_TIME_SEC,
                 single_task=TASK_DESCRIPTION,
-                display_data=False,
+                display_data=ENABLE_RERUN,
+                #display_compressed_images=True,
             )
 
-        if events["rerecord_episode"]:
-            log_say("Re-recording episode", play_sounds=PLAY_SOUNDS)
-            events["rerecord_episode"] = False
-            events["exit_early"] = False
-            dataset.clear_episode_buffer()
-            continue
+            # Reset the environment if not stopping or re-recording
+            if not events["stop_recording"] and (episode_idx < num_episodes - 1 or events["rerecord_episode"]):
+                log_say("Reset the environment", play_sounds=PLAY_SOUNDS)
+                record_loop(
+                    robot=robot,
+                    events=events,
+                    fps=FPS,
+                    teleop=None,
+                    dataset=None,
+                    teleop_action_processor=teleop_action_processor,
+                    robot_action_processor=robot_action_processor,
+                    robot_observation_processor=robot_observation_processor,
+                    control_time_s=RESET_TIME_SEC,
+                    single_task=TASK_DESCRIPTION,
+                    display_data=False,
+                )
 
-        dataset.save_episode()
-        episode_idx += 1
+            if events["rerecord_episode"]:
+                log_say("Re-recording episode", play_sounds=PLAY_SOUNDS)
+                events["rerecord_episode"] = False
+                events["exit_early"] = False
+                dataset.clear_episode_buffer()
+                continue
 
+            dataset.save_episode()
+            episode_idx += 1
+    except Exception as e:
+        log_say(f"An error occurred", play_sounds=PLAY_SOUNDS)
+        print(traceback.format_exc())
+        
     # Clean up
     log_say("Stop recording", play_sounds=PLAY_SOUNDS)
+    dataset.finalize()
+    dataset.push_to_hub()
+
     robot.disconnect()
     teleop.disconnect()
     listener.stop()
 
-    dataset.finalize()
-    dataset.push_to_hub()
+    
 
 
 if __name__ == "__main__":

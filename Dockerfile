@@ -61,6 +61,13 @@ RUN pip install --extra-index-url https://rospypi.github.io/simple/ rospy-all
 # Set up workspace
 WORKDIR /workspace
 
+# GR00T dependencies
+RUN pip install peft
+RUN git clone https://github.com/Dao-AILab/flash-attention.git
+RUN cd flash-attention && python setup.py install
+RUN python -c "import flash_attn; print(f'Flash Attention {flash_attn.__version__} imported successfully')"
+RUN pip install dm-tree
+
 # Upgrade lerobot sources to the latest available version
 RUN git clone https://github.com/huggingface/lerobot.git
 RUN cp -r ./lerobot/* /opt/lerobot/

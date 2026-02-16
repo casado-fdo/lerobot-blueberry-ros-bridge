@@ -5,7 +5,7 @@ XAUTH ?= /tmp/.docker.xauth
 XDG_RUNTIME_DIR ?= /run/user/$(shell id -u)
 
 .build:
-	docker build -t lerobot:latest -f Dockerfile . 
+	docker build -t lerobot-gr00t:latest -f Dockerfile . 
 
 .start_if_not_running:
 	@if ! docker ps --format '{{.Names}}' | grep -q '^lerobot$$'; then \
@@ -39,7 +39,7 @@ start:
 		--gpus all \
 		--runtime nvidia \
 		-t \
-		--name lerobot lerobot:latest
+		--name lerobot lerobot-gr00t:latest
 
 record: .start_if_not_running
 	docker exec -it lerobot \

@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from lerobot.cameras.configs import CameraConfig, ColorMode, Cv2Rotation
+from lerobot.cameras.configs import CameraConfig, ColorMode, Cv2Backends, Cv2Rotation
 
-__all__ = ["PLNeonCameraConfig", "ColorMode", "Cv2Rotation"]
+__all__ = ["PLNeonCameraConfig", "ColorMode", "Cv2Rotation", "Cv2Backends"]
 
 
 @CameraConfig.register_subclass("plneon")
@@ -24,6 +24,7 @@ class PLNeonCameraConfig(CameraConfig):
 
     index_or_path: int | Path
     color_mode: ColorMode = ColorMode.RGB
+    backend: Cv2Backends = Cv2Backends.ANY
     warmup_s: int = 1
 
     def __post_init__(self) -> None:

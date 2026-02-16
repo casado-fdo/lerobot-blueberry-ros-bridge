@@ -9,6 +9,7 @@ from lerobot.utils.robot_utils import precise_sleep
 from lerobot.policies.act.modeling_act import ACTPolicy, ACTTemporalEnsembler
 from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
 from lerobot.policies.xvla.modeling_xvla import XVLAPolicy
+from lerobot.policies.groot.modeling_groot import GrootPolicy
 from lerobot.policies.factory import make_pre_post_processors
 from lerobot_robot_ros import BlueberryROS, BlueberryROSConfig
 from lerobot.utils.control_utils import init_keyboard_listener
@@ -24,7 +25,6 @@ RESET_TIME_SEC = int(os.getenv("RECORDING_RESET_TIME_SEC", "5"))
 TASK_DESCRIPTION = os.getenv("RECORDING_TASK_DESCRIPTION", "No task description provided.")
 PLAY_SOUNDS = bool(os.getenv("RECORDING_PLAY_SOUNDS", "True").lower() in ("true", "1", "yes"))
 HF_USERNAME = os.getenv("HUGGINGFACE_USERNAME", "your-username-here")
-#HF_DATASET_NAME = os.getenv("HUGGINGFACE_DATASET_NAME", "default")
 
 def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act"):
     log_say("Initialising policy evaluation...", play_sounds=PLAY_SOUNDS)
@@ -48,6 +48,8 @@ def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act")
         policy = SmolVLAPolicy.from_pretrained(hf_policy_repo_id)
     elif policy_type.lower() == "xvla":
         policy = XVLAPolicy.from_pretrained(hf_policy_repo_id)
+    elif policy_type.lower() == "groot":
+        policy = GrootPolicy.from_pretrained(hf_policy_repo_id)
     else:
         raise ValueError(f"Unsupported policy type: {policy_type}")
 
@@ -58,6 +60,8 @@ def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act")
     #policy.config.temporal_ensemble_coeff=0.01
     #policy.temporal_ensembler=ACTTemporalEnsembler(policy.config.temporal_ensemble_coeff, policy.config.chunk_size)
     #policy.config.n_action_steps=1 #min(policy.config.chunk_size, 25)
+    #policy.config.chunk_size_threshold=0.9
+    #policy.config.actions_per_chunk=100
 
     # Build Policy Processors
     preprocessor, postprocessor = make_pre_post_processors(
@@ -123,7 +127,7 @@ def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act")
         episode_idx += 1
 
     # Clean up
-    log_say("Stop recording", play_sounds=PLAY_SOUNDS)
+    log_say("Stop evaluation", play_sounds=PLAY_SOUNDS)
     robot.disconnect()
     listener.stop()
 

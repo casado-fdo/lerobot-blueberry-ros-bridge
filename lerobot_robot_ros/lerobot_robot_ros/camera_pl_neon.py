@@ -17,7 +17,7 @@ import cv2
 from lerobot.utils.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError
 from lerobot.cameras.camera import Camera
 from .config_pl_neon_camera import PLNeonCameraConfig
-from lerobot.cameras.utils import get_cv2_backend, get_cv2_rotation
+from lerobot.cameras.utils import get_cv2_rotation
 from lerobot.cameras.configs import CameraConfig, ColorMode
 
 MAX_OPENCV_INDEX = 60
@@ -53,7 +53,7 @@ class PLNeonCamera(Camera):
         self.latest_frame: NDArray[Any] | None = None
         self.new_frame_event: Event = Event()
 
-        self.backend: int = get_cv2_backend()
+        self.backend: int = config.backend
 
         if self.height and self.width:
             self.capture_width, self.capture_height = self.width, self.height

@@ -43,10 +43,14 @@ start:
 
 record: .start_if_not_running
 	docker exec -it lerobot \
-		bash -c "hf auth login --token ${HUGGINGFACE_HUB_TOKEN} && python3 scripts/pl_neon_to_v4l2_streamer.py & python3 scripts/data_collector.py"
+		bash -c "hf auth login --token ${HUGGINGFACE_HUB_TOKEN} && python scripts/data_collector.py"
 
 debug: .start_if_not_running
 	docker exec -it lerobot bash
+
+eval: .start_if_not_running
+	docker exec -it lerobot \
+		bash -c "hf auth login --token ${HUGGINGFACE_HUB_TOKEN} && python -m lerobot.async_inference.policy_server --host=127.0.0.1 --port=8090 --fps=15"
 
 stop:
 	docker stop lerobot

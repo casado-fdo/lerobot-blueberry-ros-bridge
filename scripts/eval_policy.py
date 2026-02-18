@@ -1,7 +1,5 @@
 # !/usr/bin/env python
 
-import time
-
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.processor import RobotAction, RobotObservation, RobotProcessorPipeline, make_default_processors
 from lerobot.utils.constants import ACTION
@@ -60,8 +58,6 @@ def main(hf_policy_id: str, hf_dataset_id: str = None, policy_type: str = "act")
     #policy.config.temporal_ensemble_coeff=0.01
     #policy.temporal_ensembler=ACTTemporalEnsembler(policy.config.temporal_ensemble_coeff, policy.config.chunk_size)
     #policy.config.n_action_steps=1 #min(policy.config.chunk_size, 25)
-    #policy.config.chunk_size_threshold=0.9
-    #policy.config.actions_per_chunk=100
 
     # Build Policy Processors
     preprocessor, postprocessor = make_pre_post_processors(

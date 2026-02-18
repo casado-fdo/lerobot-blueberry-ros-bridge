@@ -1,4 +1,5 @@
 import time
+import logging
 from functools import cached_property
 from typing import Any
 
@@ -9,8 +10,9 @@ from lerobot.utils.errors import DeviceAlreadyConnectedError, DeviceNotConnected
 
 from .config_blueberry import BlueberryROSConfig
 from .ros_interface_blueberry import BlueberryROSInterface
+from .pl_neon_to_v4l2_streamer import NeonV4L2Process
 
-
+logger = logging.getLogger(__name__)
 
 class BlueberryROS(Robot):
     config_class = BlueberryROSConfig
@@ -20,6 +22,8 @@ class BlueberryROS(Robot):
         super().__init__(config)
         self.config = config
         self.ros_interface = BlueberryROSInterface(config)
+        pl_neon_cfg = self.config.cameras["user"]
+        self.pl_neon_streamer = NeonV4L2Process(v4l2_device="/dev/video20", fps=pl_neon_cfg.fps, target_width=pl_neon_cfg.width, target_height=pl_neon_cfg.height)
         self.cameras = make_cameras_from_configs(config.cameras)
 
     @property
@@ -64,10 +68,11 @@ class BlueberryROS(Robot):
     def connect(self, calibrate: bool = True) -> None:
         if self.is_connected:
             raise DeviceAlreadyConnectedError(f"{self} already connected")
-
+        self.pl_neon_streamer.start()
         for cam in self.cameras.values():
            cam.connect()
         self.ros_interface.connect()
+        logger.info(f"{self} connected")
 
     @property
     def is_calibrated(self) -> bool:
@@ -82,13 +87,15 @@ class BlueberryROS(Robot):
     def get_observation(self) -> dict[str, Any]:
         if not self.is_connected:
             raise DeviceNotConnectedError(f"{self} is not connected.")
-
+        start = time.perf_counter()
         obs_dict: dict[str, Any] = {}
         joint_state = self.ros_interface.joint_state
         if joint_state is None:
             raise ValueError("Joint state is not available yet.")
         obs_dict.update({f"{joint}.pos": pos for joint, pos in joint_state["position"].items()})
         obs_dict.update({f"{joint}.effort": effort for joint, effort in joint_state["effort"].items()})
+        dt_ms = (time.perf_counter() - start) * 1e3
+        logger.debug(f"{self}: joint state read in {dt_ms:.2f} ms")
 
         # Capture images from cameras
         for cam_key, cam in self.cameras.items():
@@ -98,6 +105,7 @@ class BlueberryROS(Robot):
             except Exception as e:
                 obs_dict[cam_key] = None
             dt_ms = (time.perf_counter() - start) * 1e3
+            logger.debug(f"{self}: {cam_key} read in {dt_ms:.2f} ms")
 
         return obs_dict
 
@@ -116,3 +124,5 @@ class BlueberryROS(Robot):
         for cam in self.cameras.values():
             cam.disconnect()
         self.ros_interface.disconnect()
+        self.pl_neon_streamer.stop()
+        logger.info(f"{self} disconnected")

@@ -1,14 +1,27 @@
 import rospy
 import time 
-import os
-
+import rosgraph
 from lerobot.utils.errors import DeviceNotConnectedError
 from geometry_msgs.msg import TwistStamped
 from std_msgs.msg import Float32MultiArray, Int32MultiArray
 
 from .config_blueberry import BlueberryROSConfig
 
-os.environ['ROS_PYTHON_LOG_CONFIG_FILE'] = '|'  # specify dummy file
+
+def patched_findCaller(*args, **kwargs):
+    """
+    Overwrites the legacy ROS logging caller-identification to fix 
+    a critical hang/TypeError in ROS when running on Python > 3.8.
+    This is required because:
+    - The rospypi_simple package supports Python 3.6, 3.7, and 3.8 only.
+    - We are running this code on Python >= 3.10.
+    - The stack traversal in rosgraph causes infinite loops on modern Python runtimes.
+    """
+    return "(unknown file)", 0, "(unknown function)", None
+
+# Apply the patch specifically to the class ROS uses
+rosgraph.roslogging.RospyLogger.findCaller = patched_findCaller
+
 
 class BlueberryROSInterface:
     """Class to interface with our custom Blueberry robot (ROS Noetic)."""
@@ -27,7 +40,7 @@ class BlueberryROSInterface:
 
     def connect(self) -> None:
         if not rospy.get_node_uri():
-            rospy.init_node("lerobot_ros_interface_node", anonymous=True)
+            rospy.init_node("lerobot_ros_interface_node", anonymous=True, disable_signals=True)
 
         self.r_kinova_teleop_cmd_pub = rospy.Publisher(self.config.right_arm_teleop_topic, TwistStamped, queue_size=10) 
         self.l_kinova_teleop_cmd_pub = rospy.Publisher(self.config.left_arm_teleop_topic, TwistStamped, queue_size=10)

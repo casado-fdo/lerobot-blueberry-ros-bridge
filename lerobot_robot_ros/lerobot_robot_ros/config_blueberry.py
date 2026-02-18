@@ -3,10 +3,8 @@ from dataclasses import dataclass, field
 from lerobot.cameras.realsense.configuration_realsense import RealSenseCameraConfig
 from lerobot.cameras.opencv.camera_opencv import OpenCVCamera
 from lerobot.cameras.opencv.configuration_opencv import OpenCVCameraConfig
-from lerobot.cameras.configs import ColorMode, Cv2Rotation, CameraConfig
-from .config_pl_neon_camera import PLNeonCameraConfig
+from lerobot.cameras.configs import ColorMode, Cv2Rotation, Cv2Backends,CameraConfig
 from lerobot.robots import RobotConfig
-from math import pi
 import os
 
 # Normalisation constants
@@ -46,12 +44,14 @@ class BlueberryROSConfig(RobotConfig):
         use_depth=False, # Depth is not supported yet by lerobot (TODO: add when available)
         rotation=Cv2Rotation.NO_ROTATION
     )
-    user_camera_config = PLNeonCameraConfig(
+    user_camera_config = OpenCVCameraConfig(
         index_or_path='/dev/video20',
         fps=cam_fps,
         width=cam_width,  
         height=cam_height,
         color_mode=ColorMode.RGB,
+        backend=Cv2Backends.V4L2,
+        warmup_s=1,
     )
     cameras: dict[str, CameraConfig] = field(
         default_factory=lambda: {

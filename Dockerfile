@@ -84,6 +84,9 @@ RUN apt-get update && apt-get install -y \
     gstreamer1.0-tools
 RUN apt install -y v4l2loopback-dkms v4l-utils
 
+# Install extra dependencies for asynchronous inference
+RUN pip install grpcio
+
 # Copy lerobot custom HW packages
 COPY lerobot_robot_ros /workspace/lerobot_robot_ros/
 COPY lerobot_teleoperator_ros /workspace/lerobot_teleoperator_ros/

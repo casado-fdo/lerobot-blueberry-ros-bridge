@@ -31,11 +31,7 @@ from lerobot.cameras.realsense.configuration_realsense import RealSenseCameraCon
 from lerobot.robots import (  # noqa: F401
     Robot,
     RobotConfig,
-    bi_so_follower,
-    koch_follower,
     make_robot_from_config,
-    omx_follower,
-    so_follower,
 )
 from lerobot_robot_ros import BlueberryROS, BlueberryROSConfig
 from lerobot.transport import (
@@ -45,7 +41,6 @@ from lerobot.transport import (
 from lerobot.transport.utils import grpc_channel_options, send_bytes_in_chunks
 
 from lerobot.async_inference.configs import RobotClientConfig
-from lerobot.async_inference.constants import SUPPORTED_ROBOTS
 from lerobot.async_inference.helpers import (
     Action,
     FPSTracker,

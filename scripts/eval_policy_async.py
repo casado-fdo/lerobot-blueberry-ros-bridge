@@ -39,7 +39,7 @@ def main(hf_policy_id: str, policy_type: str = "act"):
         client_device="cpu",
         policy_type=policy_type,
         pretrained_name_or_path=hf_policy_repo_id,
-        chunk_size_threshold=0.0,  # g
+        chunk_size_threshold=0.7,  # g
         actions_per_chunk=50,  # make sure this is less than the max actions of the policy
     )
 

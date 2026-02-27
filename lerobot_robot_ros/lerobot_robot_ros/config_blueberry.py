@@ -83,6 +83,7 @@ class BlueberryROSConfig(RobotConfig):
     left_arm_teleop_topic: str = "/l_kinova_/lerobot/cartesian_velocity"
     right_hand_teleop_topic: str = "/right_hand/lerobot/hand_angles"
     left_hand_teleop_topic: str = "/left_hand/lerobot/hand_angles"
+    base_teleop_topic: str = "/rnet/lerobot/joy"
     robot_joint_state_pos_topic: str = "/blueberry/joint_state/position"
     robot_joint_state_effort_topic: str = "/blueberry/joint_state/effort"
 

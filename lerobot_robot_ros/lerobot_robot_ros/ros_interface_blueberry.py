@@ -33,6 +33,7 @@ class BlueberryROSInterface:
         self.l_kinova_teleop_cmd_pub = None
         self.r_hand_teleop_cmd_pub = None
         self.l_hand_teleop_cmd_pub = None
+        self.base_teleop_cmd_pub = None
         self.joint_state_pos_sub = None
         self.joint_state_effort_sub = None
         self.is_connected = False
@@ -46,6 +47,7 @@ class BlueberryROSInterface:
         self.l_kinova_teleop_cmd_pub = rospy.Publisher(self.config.left_arm_teleop_topic, TwistStamped, queue_size=10)
         self.r_hand_teleop_cmd_pub = rospy.Publisher(self.config.right_hand_teleop_topic, Int32MultiArray, queue_size=10)
         self.l_hand_teleop_cmd_pub = rospy.Publisher(self.config.left_hand_teleop_topic, Int32MultiArray, queue_size=10)
+        self.base_teleop_cmd_pub = rospy.Publisher(self.config.base_teleop_topic, Float32MultiArray, queue_size=10)
 
         self.joint_state_pos_sub = rospy.Subscriber(self.config.robot_joint_state_pos_topic, Float32MultiArray, self._joint_state_pos_callback)
         self.joint_state_effort_sub = rospy.Subscriber(self.config.robot_joint_state_effort_topic, Float32MultiArray, self._joint_state_effort_callback)
@@ -55,32 +57,40 @@ class BlueberryROSInterface:
         self.is_connected = True
 
 
-    def send_leap_command(self, leap_command: dict[str, float]) -> None:
+    def send_action_command(self, action: dict[str, float]) -> None:
         if not self.is_connected:
             raise DeviceNotConnectedError("BlueberryROSInterface is not connected. You need to call `connect()`.")
       
-        if self.r_kinova_teleop_cmd_pub is None or self.l_kinova_teleop_cmd_pub is None:
+        if (
+            self.r_kinova_teleop_cmd_pub is None
+            or self.l_kinova_teleop_cmd_pub is None
+            or self.r_hand_teleop_cmd_pub is None
+            or self.l_hand_teleop_cmd_pub is None
+            or self.base_teleop_cmd_pub is None
+        ):
             raise DeviceNotConnectedError("Kinova command publishers are not initialised.")
-        r_arm_msg = self.cmd_to_ros_arm_twist(leap_command, prefix="r_arm_")
-        l_arm_msg = self.cmd_to_ros_arm_twist(leap_command, prefix="l_arm_")
-        r_hand_msg = self.cmd_to_ros_hand_angles(leap_command, prefix="r_hand_")
-        l_hand_msg = self.cmd_to_ros_hand_angles(leap_command, prefix="l_hand_")
-
+        r_arm_msg = self.cmd_to_ros_arm_twist(action, prefix="r_arm_")
+        l_arm_msg = self.cmd_to_ros_arm_twist(action, prefix="l_arm_")
+        r_hand_msg = self.cmd_to_ros_hand_angles(action, prefix="r_hand_")
+        l_hand_msg = self.cmd_to_ros_hand_angles(action, prefix="l_hand_")
+        base_msg = self.cmd_to_ros_base_cmd(action)
+        
         self.r_kinova_teleop_cmd_pub.publish(r_arm_msg)
         self.l_kinova_teleop_cmd_pub.publish(l_arm_msg)
         self.r_hand_teleop_cmd_pub.publish(r_hand_msg)
         self.l_hand_teleop_cmd_pub.publish(l_hand_msg)
+        self.base_teleop_cmd_pub.publish(base_msg)
 
 
-    def cmd_to_ros_arm_twist(self, leap_command: dict[str, float], prefix: str = "") -> TwistStamped:
+    def cmd_to_ros_arm_twist(self, action: dict[str, float], prefix: str = "") -> TwistStamped:
         msg = TwistStamped()
         msg.header.stamp = rospy.Time.now()
-        msg.twist.linear.x = leap_command.get(f"{prefix}linear.x", 0.0)
-        msg.twist.linear.y = leap_command.get(f"{prefix}linear.y", 0.0)
-        msg.twist.linear.z = leap_command.get(f"{prefix}linear.z", 0.0)
-        msg.twist.angular.x = leap_command.get(f"{prefix}angular.x", 0.0)
-        msg.twist.angular.y = leap_command.get(f"{prefix}angular.y", 0.0)
-        msg.twist.angular.z = leap_command.get(f"{prefix}angular.z", 0.0)
+        msg.twist.linear.x = action.get(f"{prefix}linear.x", 0.0)
+        msg.twist.linear.y = action.get(f"{prefix}linear.y", 0.0)
+        msg.twist.linear.z = action.get(f"{prefix}linear.z", 0.0)
+        msg.twist.angular.x = action.get(f"{prefix}angular.x", 0.0)
+        msg.twist.angular.y = action.get(f"{prefix}angular.y", 0.0)
+        msg.twist.angular.z = action.get(f"{prefix}angular.z", 0.0)
         return msg
 
 
@@ -93,6 +103,15 @@ class BlueberryROSInterface:
             int(leap_command.get(f"{prefix}index", 0.0)),
             int(leap_command.get(f"{prefix}thumb1", 0.0)),
             int(leap_command.get(f"{prefix}thumb2", 0.0)),
+        ]
+        return msg
+
+
+    def cmd_to_ros_base_cmd(self, action: dict[str, float]) -> Float32MultiArray:
+        msg = Float32MultiArray()
+        msg.data = [
+            action.get("base_joy.x", 0.0),
+            action.get("base_joy.y", 0.0),
         ]
         return msg
 

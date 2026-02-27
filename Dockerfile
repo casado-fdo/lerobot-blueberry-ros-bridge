@@ -73,7 +73,7 @@ RUN git clone https://github.com/huggingface/lerobot.git
 RUN cp -r ./lerobot/* /opt/lerobot/
 
 # Install Pupil Labs eye-tracking glasses dependencies
-RUN pip install pupil-labs-realtime-api 
+RUN pip install pupil-labs-realtime-api==1.8.0
 RUN apt-get update && apt-get install -y \
     libgstreamer1.0-dev \
     libgstreamer-plugins-base1.0-dev \

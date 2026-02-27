@@ -18,7 +18,7 @@ homepage = "https://github.com/casado-fdo/lerobot-ros-bridge"
 [project]
 name = "lerobot-teleoperator-ros"
 version = "0.0.1"
-description = "🤗 Leap Motion teleoperation for lerobot"
+description = "🤗 Blueberry ROS teleoperation (Leap Motion + pedals) interface for lerobot"
 authors = [
     { name = "Fernando E Casado", email = "casado.fdo@gmail.com" },
 ]

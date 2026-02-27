@@ -59,6 +59,8 @@ class BlueberryROS(Robot):
             # Right hand: 6 finger position commands
             "r_hand_pinky": float, "r_hand_ring": float, "r_hand_middle": float, 
             "r_hand_index": float, "r_hand_thumb1": float, "r_hand_thumb2": float,
+            # Base: 2 DOF joy commands
+            "base_joy.x": float, "base_joy.y": float,
         }
 
     @property
@@ -113,7 +115,7 @@ class BlueberryROS(Robot):
         if not self.is_connected:
             raise DeviceNotConnectedError(f"{self} is not connected.")
 
-        self.ros_interface.send_leap_command(action)
+        self.ros_interface.send_action_command(action)
 
         return action
 

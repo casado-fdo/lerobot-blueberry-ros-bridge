@@ -2,14 +2,20 @@ import numpy as np
 import rospy
 import os
 from geometry_msgs.msg import TwistStamped
-from std_msgs.msg import Int32MultiArray
+from std_msgs.msg import Int32MultiArray, Float32MultiArray
 
 os.environ['ROS_PYTHON_LOG_CONFIG_FILE'] = '|'  # specify dummy file
 
-class LeapMotionROSInterface():
-    """Stream hand pose commands (left and right) from leap motion input."""
+class BlueberryTeleopROSInterface():
+    """Stream hand pose commands (left and right) from leap motion input and joy commands for base control."""
 
-    def __init__(self, left_arm_topic: str, right_arm_topic: str, left_hand_topic: str = None, right_hand_topic: str = None):
+    def __init__(self, 
+        left_arm_topic: str, 
+        right_arm_topic: str, 
+        left_hand_topic: str = None, 
+        right_hand_topic: str = None,
+        base_topic: str = None,
+    ):
         # Initialize ROS node
         if not rospy.get_node_uri():
             rospy.init_node('lerobot_teleop_ros_interface', anonymous=True)
@@ -19,6 +25,7 @@ class LeapMotionROSInterface():
         self.sub_r_arm_teleop = rospy.Subscriber(right_arm_topic, TwistStamped, self.r_arm_teleop_callback)
         self.sub_l_hand_teleop = rospy.Subscriber(left_hand_topic, Int32MultiArray, self.l_hand_teleop_callback)
         self.sub_r_hand_teleop = rospy.Subscriber(right_hand_topic, Int32MultiArray, self.r_hand_teleop_callback)
+        self.sub_base_teleop = rospy.Subscriber(base_topic, Float32MultiArray, self.base_teleop_callback)
 
         self.last_l_arm_vel_command = TwistStamped()
         self.last_r_arm_vel_command = TwistStamped()
@@ -26,7 +33,8 @@ class LeapMotionROSInterface():
         self.last_l_hand_pos_command.data = [0.] * 6
         self.last_r_hand_pos_command = Int32MultiArray()
         self.last_r_hand_pos_command.data = [0.] * 6
-
+        self.last_base_joy_command = Float32MultiArray()
+        self.last_base_joy_command.data = [0.] * 2
 
     def get_latest_data(self) -> np.ndarray:
         # Return the latest data as a numpy array
@@ -44,12 +52,14 @@ class LeapMotionROSInterface():
                          self.last_r_arm_vel_command.twist.angular.y,
                          self.last_r_arm_vel_command.twist.angular.z]
         r_hand_positions = list(self.last_r_hand_pos_command.data)
+        base_joy = [self.last_base_joy_command.data[0],
+                       self.last_base_joy_command.data[1]]
 
         # Reset the last arm commands after reading
         self.last_l_arm_vel_command = TwistStamped()
         self.last_r_arm_vel_command = TwistStamped()
 
-        return np.array(l_arm_linear + l_arm_angular + l_hand_positions + r_arm_linear + r_arm_angular + r_hand_positions)
+        return np.array(l_arm_linear + l_arm_angular + l_hand_positions + r_arm_linear + r_arm_angular + r_hand_positions + base_joy)
 
 
     def l_arm_teleop_callback(self, data):
@@ -72,6 +82,10 @@ class LeapMotionROSInterface():
         self.last_r_hand_pos_command = data        
         
 
+    def base_teleop_callback(self, data):
+        # Get the base joy command
+        self.last_base_joy_command = data
+        
     def stop(self):
         # Stop the interface
-        rospy.signal_shutdown("Leap Motion ROS Interface stopped.")
+        rospy.signal_shutdown("Blueberry Teleoperation ROS Interface stopped.")

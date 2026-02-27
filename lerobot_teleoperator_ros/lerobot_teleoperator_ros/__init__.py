@@ -1,2 +1,2 @@
-from .config_leap_motion_ros import LeapMotionROSTeleopConfig
-from .leap_motion_ros import LeapMotionROSTeleop
+from .config_teleop_blueberry import BlueberryTeleopConfig
+from .teleop_blueberry import BlueberryTeleop

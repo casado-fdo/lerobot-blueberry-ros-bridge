@@ -1,6 +1,5 @@
 import cv2
 import os
-import numpy as np
 import time
 from pupil_labs.realtime_api.simple import discover_one_device
 

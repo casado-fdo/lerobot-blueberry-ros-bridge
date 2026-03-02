@@ -1,0 +1,218 @@
+import shutil
+import subprocess
+from pathlib import Path
+from tqdm import tqdm
+import json
+import argparse
+import pandas as pd
+
+from huggingface_hub import snapshot_download, create_repo, HfApi
+from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
+from lerobot.datasets.utils import create_lerobot_dataset_card
+
+
+# ============================
+# HELPERS
+# ============================
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Add default joy values to action features")
+    parser.add_argument("--src_repo", type=str, required=True, help="Source repository name (e.g., 'username/dataset-name')")
+    return parser.parse_args()
+
+def run(cmd):
+    subprocess.run(cmd, check=True)
+
+
+def main():
+    args = parse_args()
+    
+    src_repo = args.src_repo
+    dst_repo = src_repo + f"-joy"
+
+    workdir = Path("./workdir")
+    src_root = workdir / "src"
+    dst_root = workdir / "dst"
+
+    # ============================
+    # 1) DOWNLOAD SOURCE DATASET
+    # ============================
+
+    print("Downloading source dataset...")
+    src_root.mkdir(parents=True, exist_ok=True)
+
+    snapshot_download(
+        repo_id=src_repo,
+        repo_type="dataset",
+        local_dir=src_root,
+        local_dir_use_symlinks=False,
+    )
+
+    # Create the destination dataset starting from the source dataset metadata 
+    src_metadata = LeRobotDatasetMetadata(src_repo)
+    final_dataset = LeRobotDataset.create(repo_id=dst_repo, 
+                                root=dst_root,
+                                fps=src_metadata.fps,
+                                features=src_metadata.features,
+                                use_videos=True,)
+    print("✅ Downloaded source dataset")
+
+    # ============================
+    # 2) COPY NON-VIDEO FILES
+    # ============================
+
+    print("Copying data/, meta/, etc.")
+
+    if not dst_root.exists():
+        dst_root.mkdir(parents=True, exist_ok=True)
+
+    for item in ["data"]:
+        src = src_root / item
+        if src.exists():
+            if src.is_dir():
+                shutil.copytree(src, dst_root / item)
+            else:
+                shutil.copy2(src, dst_root / item)
+
+    meta_src = src_root / "meta"
+    meta_dst = dst_root / "meta"
+    for item in ["stats.json", "tasks.parquet", 'info.json']:
+        src = meta_src / item
+        if src.exists():
+            shutil.copy2(src, meta_dst / item)
+
+    episodes_src = src_root / "meta" / "episodes"
+    episodes_dst = dst_root / "meta" / "episodes"
+    for episode_dir in episodes_src.iterdir():
+        if not episode_dir.is_dir():
+            continue
+
+        dst_episode_dir = episodes_dst / episode_dir.name
+        dst_episode_dir.mkdir(parents=True, exist_ok=True)
+
+        for chunk_file in episode_dir.glob("*.parquet"):
+            shutil.copy2(chunk_file, dst_episode_dir / chunk_file.name)
+
+
+    # ============================
+    # 3) UPDATE META/INFO.JSON
+    # ============================
+    info_json_path = dst_root / "meta" / "info.json"
+    if info_json_path.exists():
+        with open(info_json_path, "r") as f:
+            info = json.load(f)
+
+        # Edit action features in metadata
+        if info["features"]["action"]["shape"][0] == 26:
+            print("✅ Action features already updated")
+            return
+        
+        info["features"]["action"]["shape"][0] += 2
+        info["features"]["action"]["names"] += ["base_joy.x", "base_joy.y"]
+        with open(info_json_path, "w") as f:
+            json.dump(info, f, indent=4)
+
+    print("✅ meta/info.json updated to match extended action space")
+
+    # ============================
+    # 4) UPDATE META/STATS.JSON 
+    # ============================
+    stats_json_path = dst_root / "meta" / "stats.json"
+    if stats_json_path.exists():
+        with open(stats_json_path, "r") as f:
+            stats = json.load(f)
+        
+        # Update action statistics with new joy features
+        action_stats = stats["action"]
+        
+        # Add 2 new values (0.0) to each statistical field
+        action_stats["min"] = action_stats["min"] + [0.0, 0.0]
+        action_stats["max"] = action_stats["max"] + [0.0, 0.0]
+        action_stats["mean"] = action_stats["mean"] + [0.0, 0.0]
+        action_stats["std"] = action_stats["std"] + [0.0, 0.0]
+        action_stats["q01"] = action_stats["q01"] + [0.0, 0.0]
+        action_stats["q10"] = action_stats["q10"] + [0.0, 0.0]
+        action_stats["q50"] = action_stats["q50"] + [0.0, 0.0]
+        action_stats["q90"] = action_stats["q90"] + [0.0, 0.0]
+        action_stats["q99"] = action_stats["q99"] + [0.0, 0.0]
+        
+        # Save updated stats
+        with open(stats_json_path, "w") as f:
+            json.dump(stats, f, indent=4)
+        
+        print("✅ meta/stats.json updated with new joy features")
+        
+
+    # ============================
+    # 5) UPDATE EPISODES
+    # ============================    
+    print("Updating episodes with new joy features...")
+    
+    data_dir = dst_root / "data"
+    if not data_dir.exists():
+        print("❌ No data directory found")
+        return
+    
+    # Process all chunk directories
+    chunk_dirs = [d for d in data_dir.iterdir() if d.is_dir() and d.name.startswith("chunk-")]
+    chunk_dirs.sort()
+    
+    for chunk_dir in tqdm(chunk_dirs, desc="Processing chunks"):
+        # Process all parquet files in the chunk
+        parquet_files = list(chunk_dir.glob("*.parquet"))
+        parquet_files.sort()
+        
+        for parquet_file in parquet_files:
+            try:
+                # Read the parquet file
+                df = pd.read_parquet(parquet_file)
+                
+                # Add new joy columns with default values (0.0)
+                df["action.base_joy.x"] = 0.0
+                df["action.base_joy.y"] = 0.0
+                
+                # Save the updated parquet file
+                df.to_parquet(parquet_file, index=False)
+                
+            except Exception as e:
+                print(f"❌ Error processing {parquet_file}: {e}")
+                continue
+    
+    print("✅ Episodes updated with new joy features")
+    
+
+    
+    # ============================
+    # 6) PUSH TO HUB
+    # ============================
+
+    print("Creating destination repo on Hugging Face...")
+
+    card = create_lerobot_dataset_card(tags=["LeRobot"], dataset_info=info, license="apache-2.0")
+
+    create_repo(
+        repo_id=dst_repo,
+        repo_type="dataset",
+        exist_ok=True,
+    )
+
+    print("Uploading extended dataset...")
+
+    api = HfApi()
+    api.upload_folder(
+        folder_path=str(dst_root),
+        repo_id=dst_repo,
+        repo_type="dataset",
+    )
+    
+    final_dataset.push_to_hub()
+    card.push_to_hub(repo_id=dst_repo, repo_type="dataset")
+    
+    print("✅ Dataset extended and uploaded to Hugging Face.")
+    print(f"\t-> New dataset: https://huggingface.co/datasets/{dst_repo}")
+
+    # Remove everything in the working directory
+    shutil.rmtree(workdir)
+    
+if __name__ == "__main__":
+    main()

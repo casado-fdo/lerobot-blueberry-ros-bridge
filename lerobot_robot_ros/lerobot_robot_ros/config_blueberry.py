@@ -53,11 +53,21 @@ class BlueberryROSConfig(RobotConfig):
         backend=Cv2Backends.V4L2,
         warmup_s=1,
     )
+    user_raw_camera_config = OpenCVCameraConfig(
+        index_or_path='/dev/video21',
+        fps=cam_fps,
+        width=cam_width,  
+        height=cam_height,
+        color_mode=ColorMode.RGB,
+        backend=Cv2Backends.V4L2,
+        warmup_s=1,
+    )
     cameras: dict[str, CameraConfig] = field(
         default_factory=lambda: {
             "left": BlueberryROSConfig.left_camera_config, 
             "right": BlueberryROSConfig.right_camera_config,
             "user": BlueberryROSConfig.user_camera_config,
+            "user_raw": BlueberryROSConfig.user_raw_camera_config,
         })
     
     

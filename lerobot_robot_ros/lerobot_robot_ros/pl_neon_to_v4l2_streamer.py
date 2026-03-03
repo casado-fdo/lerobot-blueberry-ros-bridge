@@ -10,29 +10,29 @@ logger = logging.getLogger(__name__)
 
 def _neon_stream_loop(
     stop_event,
-    v4l2_device0,
-    v4l2_device1,
     fps,
     target_width,
     target_height,
+    v4l2_device0,
+    v4l2_device1 = None,
     crop_keep_ratio=0.4,        # How much of the image to keep (0-1)
     vertical_offset_ratio=0.2,  # Vertical bias (0 = very top, 0.5 = centre)
     search_timeout=10,
 ):
-    device = None
+    pl_device = None
     out0 = None
     out1 = None
 
     try:
         logger.info("NeonV4L2Process: Looking for the next best Neon device...")
-        device = discover_one_device(
+        pl_device = discover_one_device(
             max_search_duration_seconds=search_timeout
         )
 
-        if device is None:
+        if pl_device is None:
             raise RuntimeError("No Neon device found.")
 
-        logger.info(f"NeonV4L2Process: Connecting to {device}...")
+        logger.info(f"NeonV4L2Process: Connecting to {pl_device}...")
 
         # Compute crop coordinates
         crop_width = int(RAW_WIDTH * crop_keep_ratio)
@@ -49,29 +49,33 @@ def _neon_stream_loop(
                             cv2.CAP_GSTREAMER,
                             cv2.VideoWriter_fourcc(*"MJPG"), 
                             fps, (target_width, target_height))
+        if v4l2_device1 is not None:
+            gst_str1 = (f"appsrc ! videoconvert ! v4l2sink device={v4l2_device1} sync=false")
+            out1 = cv2.VideoWriter(gst_str1,
+                                cv2.CAP_GSTREAMER,
+                                cv2.VideoWriter_fourcc(*"MJPG"), 
+                                fps, (target_width, target_height))
 
-        gst_str1 = (f"appsrc ! videoconvert ! v4l2sink device={v4l2_device1} sync=false")
-        out1 = cv2.VideoWriter(gst_str1,
-                            cv2.CAP_GSTREAMER,
-                            cv2.VideoWriter_fourcc(*"MJPG"), 
-                            fps, (target_width, target_height))
-
-        if not out0.isOpened() or not out1.isOpened():
+        if not out0.isOpened() or (v4l2_device1 is not None and not out1.isOpened()):
             raise RuntimeError("Failed to open VideoWriter.")
 
-        logger.info(f"NeonV4L2Process: VideoWriter opened successfully, writing to {v4l2_device0} and {v4l2_device1}")
+        if v4l2_device1 is not None:
+            logger.info(f"NeonV4L2Process: VideoWriter opened successfully, writing to {v4l2_device0} and {v4l2_device1}")
+        else:
+            logger.info(f"NeonV4L2Process: VideoWriter opened successfully, writing to {v4l2_device0}")
 
         cv2.setNumThreads(1)
 
         while not stop_event.is_set():
             
             # Get the next video frame and gaze data
-            frame, gaze = device.receive_matched_scene_video_frame_and_gaze()
+            frame, gaze = pl_device.receive_matched_scene_video_frame_and_gaze()
 
-            # Create a copy of the frame, resize it and write it to the second V4L2 device (raw data)
-            frame_raw = frame.bgr_pixels.copy()
-            final_frame_raw = cv2.resize(frame_raw, (target_width, target_height), interpolation=cv2.INTER_LINEAR)
-            out1.write(final_frame_raw)
+            if v4l2_device1 is not None:
+                # Create a copy of the frame, resize it and write it to the second V4L2 device (raw data)
+                frame_raw = frame.bgr_pixels.copy()
+                final_frame_raw = cv2.resize(frame_raw, (target_width, target_height), interpolation=cv2.INTER_LINEAR)
+                out1.write(final_frame_raw)
             
             # Draw gaze on the frame
             cv2.circle(
@@ -103,15 +107,15 @@ def _neon_stream_loop(
         if out1 is not None:
             out1.release()
 
-        if device is not None:
-            device.close()
+        if pl_device is not None:
+            pl_device.close()
 
 
 class NeonV4L2Process:
     def __init__(
         self,
         v4l2_device0="/dev/video20",
-        v4l2_device1="/dev/video21",
+        v4l2_device1=None,
         fps=15,
         target_width=320,
         target_height=240,
@@ -141,11 +145,11 @@ class NeonV4L2Process:
             target=_neon_stream_loop,
             args=(
                 self._stop_event,
-                self.v4l2_device0,
-                self.v4l2_device1,
                 self.fps,
                 self.target_width,
                 self.target_height,
+                self.v4l2_device0,
+                self.v4l2_device1,
                 self.crop_keep_ratio,
                 self.vertical_offset_ratio,
                 self.search_timeout,

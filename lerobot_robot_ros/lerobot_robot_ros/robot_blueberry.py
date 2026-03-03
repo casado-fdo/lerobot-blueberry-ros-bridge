@@ -24,7 +24,7 @@ class BlueberryROS(Robot):
         self.ros_interface = BlueberryROSInterface(config)
         pl_neon_cfg = self.config.cameras["user"]
         self.pl_neon_streamer = NeonV4L2Process(v4l2_device0="/dev/video20", 
-                                                v4l2_device1="/dev/video21", 
+                                                v4l2_device1="/dev/video21" if "user_raw" in self.config.cameras else None,
                                                 fps=pl_neon_cfg.fps, 
                                                 target_width=pl_neon_cfg.width, 
                                                 target_height=pl_neon_cfg.height)

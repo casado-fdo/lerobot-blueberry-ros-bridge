@@ -3,16 +3,11 @@ import base64
 import io
 import os
 import time
-import subprocess
-from typing import Literal
 
 import cv2
-from dotenv import load_dotenv
 from ollama import Client
 from pupil_labs.realtime_api.simple import discover_one_device
-from gtts import gTTS
-
-load_dotenv()
+from utils import log_say
 
 
 class OllamaAssistant:
@@ -41,7 +36,7 @@ class OllamaAssistant:
 
         self.client = Client(host=ollama_host)
         self.ollama_host = ollama_host
-        self.model = "qwen2.5vl:3b"  # options: moondream, llava, qwen2.5vl:3b, llama3.2-vision
+        self.model = "llama3.2-vision"  # options: llava, qwen2.5vl:3b, qwen3-vl:4b, llama3.2-vision
 
         self.setup_prompts()
         self.mode = "describe"
@@ -113,43 +108,12 @@ class OllamaAssistant:
         _, buffer = cv2.imencode(".jpg", self.matched)
         self.base64_frame = base64.b64encode(buffer).decode("utf-8")
 
-    def say(self, text: str):
-        """
-        Text-to-speech using gTTS (Google Text-to-Speech) and mpg123.
-        Works reliably without extra dependencies.
-        
-        Args:
-            text: The text to speak
-        """
-        temp_file = "/tmp/speech_output.mp3"
-        
-        try:
-            # Create the audio file using gTTS
-            tts = gTTS(text=text, lang='en')
-            tts.save(temp_file)
-
-            # Play the audio file using mpg123
-            cmd = ["mpg123", temp_file]
-            subprocess.run(cmd, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            
-        except FileNotFoundError:
-            print("⚠️  mpg123 not found. Install with: apt-get install mpg123")
-        except Exception as e:
-            print(f"⚠️  Failed to play audio: {e}")
-        finally:
-            # Clean up the temporary file
-            if os.path.exists(temp_file):
-                try:
-                    os.remove(temp_file)
-                except:
-                    pass
-
     def assist(self):
         """
         Analyze the gaze point using the vision model and provide audio feedback.
         """
         try:
-            print(f"\n🔍 Analyzing with mode: {self.mode}...")
+            log_say(f"Analyzing with mode: {self.mode}...")
 
             # Prepare the full prompt
             full_prompt = (
@@ -165,6 +129,8 @@ class OllamaAssistant:
                 prompt=full_prompt,
                 images=[self.base64_frame],
                 stream=False,
+                think=False,
+                keep_alive="0",
             )
             inference_time = time.time() - start_time
 
@@ -179,12 +145,12 @@ class OllamaAssistant:
                     print(f"   Raw response: {response_text[:50]}...")
                 else:
                     # Valid response - say it
-                    self.say(response_text)
+                    log_say(response_text)
 
             # Log the interaction
             self.session_count += 1
             print(
-                f"✓ Response: {response_text[:100]}"
+                f"✓ Response: {response_text}"
             )
             print(
                 f"  Inference time: {inference_time:.2f}s | Session interactions: {self.session_count}"

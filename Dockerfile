@@ -98,4 +98,11 @@ RUN pip install -e lerobot_teleoperator_ros
 # Copy scripts
 COPY scripts /workspace/scripts/
 
+# Ollama required dependencies
+RUN pip install \
+    ollama \
+    pydub \
+    python-dotenv \
+    pyttsx3
+
 CMD ["/bin/bash"]

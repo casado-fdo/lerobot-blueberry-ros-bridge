@@ -36,6 +36,7 @@ start:
 		-v /tmp/argus_socket:/tmp/argus_socket \
 		-v /home/${USER}/.cache/at-spi:/home/${USER}/.cache/at-spi \
 		--net host \
+		--add-host=host.docker.internal:host-gateway \
 		--gpus all \
 		--runtime nvidia \
 		-t \

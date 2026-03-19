@@ -8,13 +8,50 @@ import cv2
 from ollama import Client
 from pupil_labs.realtime_api.simple import discover_one_device
 from utils import log_say
+import sys
 
+import logging
+from pynput import keyboard
+
+
+def init_keyboard_listener():
+    # Dictionary to store the state of our keys
+    events = {
+        "enter": False,
+        "esc": False,
+        "last_number": None
+    }
+
+    def on_press(key):
+        # Clear the line immediately to prevent echoed characters from showing
+        print("\r\033[K", end='', flush=True) 
+        try:
+            # 1. Detect Numbers 1-4
+            # pynput handles character keys through the .char attribute
+            if hasattr(key, 'char') and key.char in ['1', '2', '3', '4']:
+                events["last_number"] = int(key.char)
+
+            # 2. Detect Arrows/ENTER/ESC
+            elif key == keyboard.Key.right or key == keyboard.Key.enter:
+                events["enter"] = True
+            #elif key == keyboard.Key.left:
+            #    print("Left arrow pressed.")
+            elif key == keyboard.Key.esc:
+                events["esc"] = True
+                return False  # Returning False stops the listener thread
+
+        except Exception as e:
+            print(f"Error: {e}")
+
+    # Start the listener in a non-blocking way
+    listener = keyboard.Listener(on_press=on_press)
+    listener.start()
+
+    return listener, events
 
 class OllamaAssistant:
     """
-    Eye-tracking visual assistant using Ollama with local vision models.
-    Terminal-only interface (no GUI window).
-    Free alternative to OpenAI's API - all processing happens locally.
+    Eye-tracking visual assistant using Pupil Lab's Neon glasses together with Ollama for local vision models.
     """
 
     def __init__(self, ollama_host: str = None):
@@ -33,6 +70,8 @@ class OllamaAssistant:
         self.frame_target_width = 640
         self.frame_target_height = 480
         self.raw_width, self.raw_height = 1600, 1200  # native Neon resolution
+
+        self.key_listener, self.key_events = init_keyboard_listener()
 
         self.client = Client(host=ollama_host)
         self.ollama_host = ollama_host
@@ -55,6 +94,7 @@ class OllamaAssistant:
             raise SystemExit(-1)
 
         print(f"Connecting to {self.device}...")
+        
 
     def setup_prompts(self):
         """Define analysis prompts for different modes."""
@@ -76,7 +116,7 @@ class OllamaAssistant:
                 "briefly try to infer the wearer's intention based on what they are looking at. "
                 "Maximum of 20 words."
             ),
-            "in_detail": (
+            "in detail": (
                 "Describe the scene in detail, as if you were reading it aloud. "
                 "Less than one minute of speaking (max 100 words)."
             ),
@@ -114,6 +154,10 @@ class OllamaAssistant:
         """
         try:
             log_say(f"Analyzing with mode: {self.mode}...")
+
+            # Open a winddow displaying the frame
+            cv2.imshow("Frame", self.matched)
+            cv2.waitKey(1)
 
             # Prepare the full prompt
             full_prompt = (
@@ -165,67 +209,57 @@ class OllamaAssistant:
         print("Eye-Tracking Assistant (Ollama - Terminal Mode)")
         print("=" * 60)
         print("Commands:")
-        print("  1 (or d) - Describe mode (8 words)")
-        print("  2 (or s) - Dangers mode (identify risks)")
-        print("  3 (or i) - Intention mode (infer user intent)")
-        print("  4 (or f) - In Detail mode (full description)")
-        print("  a        - Analyze current frame")
-        print("  q        - Quit")
+        print("  1        - Describe mode (8 words)")
+        print("  2        - Dangers mode (identify risks)")
+        print("  3        - Intention mode (infer user intent)")
+        print("  4        - In Detail mode (full description)")
+        print("  ->/ENTER - Analyze current frame") # right arrow or enter
+        print("  ESC/q    - Quit")
         print("=" * 60)
 
-    def get_user_input(self):
-        """Get user input in a non-blocking way."""
-        import select
-        import sys
-        
-        # Check if there's input available (Unix/Linux only)
-        if select.select([sys.stdin], [], [], 0)[0]:
-            try:
-                return sys.stdin.read(1).lower()
-            except:
-                return None
-        return None
 
     def run(self):
         """Main event loop - terminal based."""
+        # Get the first frame from the camera and do nothing with it
+        self.process_frame()
         self.print_menu()
         
         print("\nStarting eye-tracking loop...")
-        print("(Frames are being captured but not analyzed until you press 'a')\n")
+        print("(Frames are being captured but not analyzed until you press -> or ENTER)\n")
 
         try:
             while self.running:
                 # Capture frame (but don't analyze it yet)
                 if not self.process_frame():
                     continue
+                # Check for user input
+                if self.key_events.get("enter", False):
+                    self.encode_image()
+                    self.assist()
+                    self.key_events["enter"] = False
+                elif self.key_events.get("esc", False):
+                    print("Quitting...")
+                    self.running = False
+                    self.key_events["esc"] = False
+                elif self.key_events.get("last_number", None) is not None:
+                    key = str(self.key_events["last_number"])
 
-                # Check for user input (non-blocking)
-                user_input = self.get_user_input()
-                
-                if user_input:
-                    print()  # New line after input
-                    
-                    if user_input == "q":
-                        print("Quitting...")
-                        self.running = False
-                    elif user_input in ["1", "d"]:
+                    if key == "1":
                         self.mode = "describe"
                         print(f"Mode set to: Describe")
-                    elif user_input in ["2", "s"]:
+                    elif key == "2":
                         self.mode = "dangers"
                         print(f"Mode set to: Dangers")
-                    elif user_input in ["3", "i"]:
+                    elif key == "3":
                         self.mode = "intention"
-                        print(f"Mode set to: Intention")
-                    elif user_input in ["4", "f"]:
-                        self.mode = "in_detail"
+                        print(f"Mode set to: Intention")    
+                    elif key == "4":
+                        self.mode = "in detail"
                         print(f"Mode set to: In Detail")
-                    elif user_input == "a":
-                        self.encode_image()
-                        self.assist()
-                    else:
-                        # Ignore unknown commands silently (spaces, etc)
-                        pass
+                    self.key_events["last_number"] = None
+                else:
+                    # Ignore unknown commands silently (spaces, etc)
+                    pass
 
         except KeyboardInterrupt:
             print("\n\nInterrupted by user")

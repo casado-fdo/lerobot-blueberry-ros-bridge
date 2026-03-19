@@ -12,29 +12,7 @@ import sys
 import logging
 from pynput import keyboard
 import matplotlib.pyplot as plt
-
-plt.ion()  # Turn on interactive mode
-fig, ax = plt.subplots()
-image_display = None
-
-def update_plot(img):
-    global image_display
-    
-    # 1. Convert BGR to RGB
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    
-    # 2. If it's the first time, create the display object
-    if image_display is None:
-        image_display = ax.imshow(img_rgb)
-        ax.axis('off')
-    else:
-        # 3. Just update the data (much faster, prevents grey screen)
-        image_display.set_data(img_rgb)
-    
-    # 4. Force a draw and a tiny pause to let Ubuntu paint the window
-    fig.canvas.draw()
-    fig.canvas.flush_events()
-    plt.pause(0.001)
+from pygame import mixer
 
 def init_keyboard_listener():
     # Dictionary to store the state of our keys
@@ -106,6 +84,15 @@ class OllamaAssistant:
         self.session_count = 0
         self.initialise_device()
 
+        # Initialise pygame mixer for audio
+        mixer.init()
+        self.waiting_music = mixer.Sound("media/waiting_music.mp3")
+
+        # Initialise matplotlib plot for displaying frames
+        plt.ion()  # Turn on interactive mode
+        self.fig, self.ax = plt.subplots()
+        self.image_display = None
+
 
     def initialise_device(self):
         """Connect to Pupil Labs eye-tracking glasses."""
@@ -116,7 +103,24 @@ class OllamaAssistant:
             raise SystemExit(-1)
 
         print(f"Connecting to {self.device}...")
+
+    def update_plot(self, img):
         
+        # 1. Convert BGR to RGB
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        
+        # 2. If it's the first time, create the display object
+        if self.image_display is None:
+            self.image_display = self.ax.imshow(img_rgb)
+            self.ax.axis('off')
+        else:
+            # 3. Just update the data (much faster, prevents grey screen)
+            self.image_display.set_data(img_rgb)
+        
+        # 4. Force a draw and a tiny pause to let Ubuntu paint the window
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+        plt.pause(0.001)
 
     def setup_prompts(self):
         """Define analysis prompts for different modes."""
@@ -171,35 +175,33 @@ class OllamaAssistant:
         self.base64_frame = base64.b64encode(buffer).decode("utf-8")
 
     def assist(self):
-        """
-        Analyze the gaze point using the vision model and provide audio feedback.
-        """
         try:
-            log_say(f"Analyzing with mode: {self.mode}...")
+            log_say(f"Analyzing scene...")
+            self.update_plot(self.matched)
 
-            # Display the analyzed frame in a window
-            update_plot(self.matched)
+            # 1. Start the music on a loop (-1 means infinite loop)
+            # We use a 'Channel' so we can stop it precisely later
+            music_channel = self.waiting_music.play(loops=-1)
+            music_channel.set_volume(0.9) # Keep it at 90% volume so it's subtle
 
-            # Prepare the full prompt
-            full_prompt = (
-                self.prompts["base"]
-                + "\n\n"
-                + self.prompts[self.mode]
-            )
+            # Prepare the prompt
+            full_prompt = self.prompts["base"] + "\n\n" + self.prompts[self.mode]
 
-            # Call Ollama with vision model
+            # 2. Call Ollama (The music plays while the main thread is busy here)
             start_time = time.time()
             response = self.client.generate(
                 model=self.model,
                 prompt=full_prompt,
                 images=[self.base64_frame],
                 stream=False,
-                think=False,
                 keep_alive="0",
             )
             inference_time = time.time() - start_time
 
             response_text = response["response"].strip()
+
+            # 3. Stop the music the moment the model returns a result
+            music_channel.fadeout(500) # Smooth 0.5s fade out
 
             # Check if response is gibberish (many repeated characters)
             if len(response_text) > 0:
@@ -222,7 +224,8 @@ class OllamaAssistant:
             )
 
         except Exception as e:
-            print(f"✗ Error during analysis: {type(e).__name__}: {e}")
+            mixer.stop() # Safety stop if the code crashes
+            print(f"✗ Error during analysis: {e}")
 
     def print_menu(self):
         """Print the terminal menu."""
@@ -235,7 +238,7 @@ class OllamaAssistant:
         print("  3        - Intention mode (infer user intent)")
         print("  4        - In Detail mode (full description)")
         print("  ->/ENTER - Analyze current frame") # right arrow or enter
-        print("  ESC/q    - Quit")
+        print("  ESC      - Quit")
         print("=" * 60)
 
 

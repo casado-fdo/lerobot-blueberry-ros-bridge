@@ -1,4 +1,3 @@
-
 import base64
 import io
 import os
@@ -12,7 +11,30 @@ import sys
 
 import logging
 from pynput import keyboard
+import matplotlib.pyplot as plt
 
+plt.ion()  # Turn on interactive mode
+fig, ax = plt.subplots()
+image_display = None
+
+def update_plot(img):
+    global image_display
+    
+    # 1. Convert BGR to RGB
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    
+    # 2. If it's the first time, create the display object
+    if image_display is None:
+        image_display = ax.imshow(img_rgb)
+        ax.axis('off')
+    else:
+        # 3. Just update the data (much faster, prevents grey screen)
+        image_display.set_data(img_rgb)
+    
+    # 4. Force a draw and a tiny pause to let Ubuntu paint the window
+    fig.canvas.draw()
+    fig.canvas.flush_events()
+    plt.pause(0.001)
 
 def init_keyboard_listener():
     # Dictionary to store the state of our keys
@@ -135,8 +157,8 @@ class OllamaAssistant:
             thickness=8,
         )
 
-        # Crop to central region (remove 40% of margins)
-        final_frame = frame.bgr_pixels[int(self.raw_height * 0.4):int(self.raw_height * 0.6), int(self.raw_width * 0.4):int(self.raw_width * 0.6)]
+        # Crop to central region (remove 25% of margins)
+        final_frame = frame.bgr_pixels[int(self.raw_height * 0.25):int(self.raw_height * 0.75), int(self.raw_width * 0.25):int(self.raw_width * 0.75)]
                 
         # Resize frame to target resolution
         self.matched = cv2.resize(final_frame, (self.frame_target_width, self.frame_target_height), interpolation=cv2.INTER_LINEAR)
@@ -155,9 +177,8 @@ class OllamaAssistant:
         try:
             log_say(f"Analyzing with mode: {self.mode}...")
 
-            # Open a winddow displaying the frame
-            cv2.imshow("Frame", self.matched)
-            cv2.waitKey(1)
+            # Display the analyzed frame in a window
+            update_plot(self.matched)
 
             # Prepare the full prompt
             full_prompt = (

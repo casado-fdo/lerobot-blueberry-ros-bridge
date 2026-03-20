@@ -1,0 +1,5 @@
+You just asked me: "Tell me what you see in the scene with some detail."
+
+I should answer in less than 1 minute of speaking (max 100 words).
+
+Based on what I see, I should now say: 

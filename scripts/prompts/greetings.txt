@@ -1,0 +1,5 @@
+You just started my software. I should say hi (or good morning, afternoon, evening, depending on the time of day) to you being friendly and welcoming.
+
+My greetings should be short (less than 10 words).
+
+I should now say:

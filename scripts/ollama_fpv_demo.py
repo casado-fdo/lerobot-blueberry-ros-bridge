@@ -14,6 +14,11 @@ from pynput import keyboard
 import matplotlib.pyplot as plt
 from pygame import mixer
 
+USER_NAME = "Fernando"
+USER_GENDER = "male"
+DAY_OF_WEEK = "Monday"
+CURRENT_TIME = time.strftime("%H:%M")
+
 def init_keyboard_listener():
     # Dictionary to store the state of our keys
     events = {
@@ -76,7 +81,7 @@ class OllamaAssistant:
 
         self.client = Client(host=ollama_host)
         self.ollama_host = ollama_host
-        self.model = "llava:7b-v1.6-mistral-q2_K"  # options: llava:7b-v1.6-mistral-q2_K, qwen2.5vl:3b, qwen3-vl:2b, qwen3-vl:4b, llama3.2-vision, moondream
+        self.model = "llama3.2-vision"  # options: llava:7b-v1.6-mistral-q2_K, qwen2.5vl:3b, qwen3-vl:2b, qwen3-vl:4b, llama3.2-vision, moondream
 
         self.setup_prompts()
         self.mode = "describe"
@@ -123,29 +128,33 @@ class OllamaAssistant:
         self.fig.canvas.flush_events()
         plt.pause(0.001)
 
+    def read_prompt(self, prompt_name):
+        """Read a prompt from a file."""
+        with open(f"scripts/prompts/{prompt_name}.txt", "r") as f:
+            return f.read()
+
     def setup_prompts(self):
         """Define analysis prompts for different modes."""
         self.prompts = {
             "base": (
-                "You are a visual and communication aid for individuals with visual impairment "
-                "(low vision) or communication difficulties. They are wearing eye-tracking glasses. "
-                "An image is being sent with a red circle indicating where the wearer is looking. "
-                "Do not describe the whole image unless explicitly asked. Be succinct and concise. "
-                "Reply in English only."
+                self.read_prompt("base")
             ),
-            "describe": "In a couple of words (max. 8 words), say what the person is looking at.",
-            "dangers": (
-                "Briefly indicate if there is any risk posing danger to the person in the scene. "
-                "Be succinct (max 20 words)."
+            "describe": (
+                self.read_prompt("describe")
             ),
             "intention": (
-                "Given that the wearer may have mobility and speaking difficulties, "
-                "briefly try to infer the wearer's intention based on what they are looking at. "
-                "Maximum of 20 words."
+                self.read_prompt("intention")
             ),
             "in detail": (
-                "Describe the scene in detail, as if you were reading it aloud. "
-                "Less than one minute of speaking (max 100 words)."
+                self.read_prompt("in_detail")
+            ),
+            "greetings": (
+                self.read_prompt("greetings")
+            ),
+            "additional_context": (
+                f"Today is {DAY_OF_WEEK} and the current time is {CURRENT_TIME}. "
+                f"My name is Blueberry, and I am your bimanual robot wheelchair. "
+                f"Your name is {USER_NAME}, and you identify as a {USER_GENDER}."
             ),
         }
 
@@ -175,9 +184,19 @@ class OllamaAssistant:
         _, buffer = cv2.imencode(".jpg", self.matched)
         self.base64_frame = base64.b64encode(buffer).decode("utf-8")
 
+    def call_ollama(self, prompt, image=None):
+        """Call Ollama with the given prompt."""
+        return self.client.generate(
+            model=self.model,
+            prompt=prompt,
+            images=[image] if image else None,
+            stream=False,
+            keep_alive="0",
+        )
+
     def assist(self):
         try:
-            log_say(f"Analyzing scene...", play_engine="kokoro")
+            #log_say(f"Analyzing scene...", play_engine="kokoro")
             self.update_plot(self.matched)
 
             # Start the music on a loop (-1 means infinite loop)
@@ -185,17 +204,11 @@ class OllamaAssistant:
             music_channel.set_volume(0.7)
 
             # Prepare the prompt
-            full_prompt = self.prompts["base"] + "\n\n" + self.prompts[self.mode]
+            full_prompt = self.prompts["base"] + "\n\n" + self.prompts["additional_context"] + "\n\n" + self.prompts[self.mode]
 
             # Call Ollama (The music plays while the main thread is busy here)
             start_time = time.time()
-            response = self.client.generate(
-                model=self.model,
-                prompt=full_prompt,
-                images=[self.base64_frame],
-                stream=False,
-                keep_alive="0",
-            )
+            response = self.call_ollama(full_prompt, self.base64_frame)
             inference_time = time.time() - start_time
 
             response_text = response["response"].strip()
@@ -231,9 +244,8 @@ class OllamaAssistant:
         print("=" * 60)
         print("Commands:")
         print("  1        - Describe mode (8 words)")
-        print("  2        - Dangers mode (identify risks)")
-        print("  3        - Intention mode (infer user intent)")
-        print("  4        - In Detail mode (full description)")
+        print("  2        - Intention mode (infer user intent)")
+        print("  3        - In Detail mode (full description)")
         print("  ->/ENTER - Analyze current frame") # right arrow or enter
         print("  ESC      - Quit")
         print("=" * 60)
@@ -241,10 +253,13 @@ class OllamaAssistant:
 
     def run(self):
         """Main event loop - terminal based."""
-        # Get the first frame from the camera and do nothing with it
-        self.process_frame()
-        self.print_menu()
         
+        init_prompt = self.prompts["base"] + "\n" + self.prompts["additional_context"] + "\n" + self.prompts["greetings"]
+        greetings = self.call_ollama(init_prompt)["response"].strip()
+        log_say(greetings, play_engine="kokoro")
+
+        self.print_menu()
+
         print("\nStarting eye-tracking loop...")
         print("(Frames are being captured but not analyzed until you press -> or ENTER)\n")
 
@@ -269,14 +284,11 @@ class OllamaAssistant:
                         self.mode = "describe"
                         print(f"Mode set to: Describe")
                     elif key == "2":
-                        self.mode = "dangers"
-                        print(f"Mode set to: Dangers")
-                    elif key == "3":
                         self.mode = "intention"
-                        print(f"Mode set to: Intention")    
-                    elif key == "4":
+                        print(f"Mode set to: Intention")
+                    elif key == "3":
                         self.mode = "in detail"
-                        print(f"Mode set to: In Detail")
+                        print(f"Mode set to: In Detail")    
                     self.key_events["last_number"] = None
                 else:
                     # Ignore unknown commands silently (spaces, etc)

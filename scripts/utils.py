@@ -40,16 +40,15 @@ def say_kokoro(text):
     """
     try:
         # Initialise the Kokoro TTS pipeline
-        pipeline = KPipeline(lang_code='b', repo_id='hexgrad/Kokoro-82M', device='cuda')
-        voice = 'af_heart'
+        pipeline = KPipeline(lang_code='a', repo_id='hexgrad/Kokoro-82M', device='cuda')
+        voice = 'af_bella'
         generator = pipeline(text, voice=voice, speed=1, split_pattern=r'\n+')
 
         for i, (gs, ps, audio) in enumerate(generator):
             # Save the output to a file
             output_filename = f"test_output_{i}.wav"
             sf.write(output_filename, audio, 24000)
-        
-        play_sound(output_filename)
+            play_sound(output_filename)
     except Exception as e:
         print(f"Failed to create or play audio file: {e}")
     finally:

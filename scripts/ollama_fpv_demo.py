@@ -201,7 +201,7 @@ class OllamaAssistant:
             response_text = response["response"].strip()
 
             # Stop the music the moment the model returns a result
-            music_channel.fadeout(500) # Smooth 0.5s fade out
+            music_channel.fadeout(1000) # Smooth 1s fade out
 
             # Check if response is gibberish (many repeated characters)
             if len(response_text) > 0:

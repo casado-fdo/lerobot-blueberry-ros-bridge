@@ -105,6 +105,8 @@ RUN pip install \
     python-dotenv \
     pyttsx3 \
     pygame \
-    kokoro
+    kokoro \
+    soundfile
+RUN apt install -y espeak-ng
 
 CMD ["/bin/bash"]

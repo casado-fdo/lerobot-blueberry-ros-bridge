@@ -71,11 +71,12 @@ class OllamaAssistant:
         self.frame_target_height = 480
         self.raw_width, self.raw_height = 1600, 1200  # native Neon resolution
 
+
         self.key_listener, self.key_events = init_keyboard_listener()
 
         self.client = Client(host=ollama_host)
         self.ollama_host = ollama_host
-        self.model = "llama3.2-vision"  # options: llava, qwen2.5vl:3b, qwen3-vl:4b, llama3.2-vision
+        self.model = "llava:7b-v1.6-mistral-q2_K"  # options: llava:7b-v1.6-mistral-q2_K, qwen2.5vl:3b, qwen3-vl:2b, qwen3-vl:4b, llama3.2-vision, moondream
 
         self.setup_prompts()
         self.mode = "describe"
@@ -176,18 +177,17 @@ class OllamaAssistant:
 
     def assist(self):
         try:
-            log_say(f"Analyzing scene...")
+            log_say(f"Analyzing scene...", play_engine="kokoro")
             self.update_plot(self.matched)
 
-            # 1. Start the music on a loop (-1 means infinite loop)
-            # We use a 'Channel' so we can stop it precisely later
+            # Start the music on a loop (-1 means infinite loop)
             music_channel = self.waiting_music.play(loops=-1)
-            music_channel.set_volume(0.9) # Keep it at 90% volume so it's subtle
+            music_channel.set_volume(0.7)
 
             # Prepare the prompt
             full_prompt = self.prompts["base"] + "\n\n" + self.prompts[self.mode]
 
-            # 2. Call Ollama (The music plays while the main thread is busy here)
+            # Call Ollama (The music plays while the main thread is busy here)
             start_time = time.time()
             response = self.client.generate(
                 model=self.model,
@@ -200,7 +200,7 @@ class OllamaAssistant:
 
             response_text = response["response"].strip()
 
-            # 3. Stop the music the moment the model returns a result
+            # Stop the music the moment the model returns a result
             music_channel.fadeout(500) # Smooth 0.5s fade out
 
             # Check if response is gibberish (many repeated characters)
@@ -212,13 +212,10 @@ class OllamaAssistant:
                     print(f"   Raw response: {response_text[:50]}...")
                 else:
                     # Valid response - say it
-                    log_say(response_text)
+                    log_say(response_text, play_engine="kokoro")
 
             # Log the interaction
             self.session_count += 1
-            print(
-                f"✓ Response: {response_text}"
-            )
             print(
                 f"  Inference time: {inference_time:.2f}s | Session interactions: {self.session_count}"
             )

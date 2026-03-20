@@ -1,40 +1,83 @@
 import os
 import subprocess
 from gtts import gTTS
+from kokoro import KPipeline
+import torch
+import soundfile as sf
+import pygame
 
-def say(text):
+def say(text, engine: str = "gtts"):
+    if engine == "gtts":
+        say_gtts(text)
+    elif engine == "kokoro":
+        say_kokoro(text)
+
+def say_gtts(text):
     """
-    Replaces system-dependent 'say' with gTTS (Google Text-to-Speech)
-    and plays it using the system's mpg123 command.
+    Uses gTTS to generate speech and plays it.
     """
-    temp_file = "/tmp/speech_output.mp3"
-    
+    temp_file = "/tmp/speech_output.mp3"    
     try:
-        # 1. Create the audio file using gTTS and save it
+        # Generate the audio file using gTTS and save it
         tts = gTTS(text=text, lang='en')
         tts.save(temp_file)
 
-        # 2. Play the audio file using the blocking 'subprocess.run'
-        cmd = ["mpg123", temp_file]
-        subprocess.run(cmd, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Play the audio file
+        play_sound(temp_file)
         
     except Exception as e:
         # Log any other failure (like gTTS failing to contact Google)
         print(f"Failed to create or play audio file: {e}")
         
     finally:
-        # 3. Clean up the temporary file
+        # Clean up the temporary file
         if os.path.exists(temp_file):
             os.remove(temp_file)
 
+def say_kokoro(text):
+    """
+    Uses Kokoro TTS to generate speech and plays it.
+    """
+    try:
+        # Initialise the Kokoro TTS pipeline
+        pipeline = KPipeline(lang_code='b', repo_id='hexgrad/Kokoro-82M', device='cuda')
+        voice = 'af_heart'
+        generator = pipeline(text, voice=voice, speed=1, split_pattern=r'\n+')
 
-def log_say(text: str, play_sounds: bool = True) -> None:
+        for i, (gs, ps, audio) in enumerate(generator):
+            # Save the output to a file
+            output_filename = f"test_output_{i}.wav"
+            sf.write(output_filename, audio, 24000)
+        
+        play_sound(output_filename)
+    except Exception as e:
+        print(f"Failed to create or play audio file: {e}")
+    finally:
+        # Clean up the temporary file
+        if os.path.exists(output_filename):
+            os.remove(output_filename)
+
+def play_sound(file_path: str):
+    """
+    Plays a sound file using pygame.
+    """
+    try:
+        pygame.mixer.init()
+        pygame.mixer.music.load(file_path)
+        pygame.mixer.music.play()
+        while pygame.mixer.music.get_busy():
+            pygame.time.Clock().tick(10)
+    except Exception as e:
+        print(f"Failed to play audio file: {e}")
+
+def log_say(text: str, play_sounds: bool = True, play_engine: str = "gtts") -> None:
     """Logs the given text and optionally plays it as speech.
 
     Args:
         text (str): The text to log and speak.
         play_sounds (bool): Whether to play the speech audio.
+        play_engine (str): The speech engine to use ('gtts' or 'kokoro').
     """
     print(f"\n{'='*60}\n🤖 {text}\n{'='*60}\n")
     if play_sounds:
-        say(text)
+        say(text, engine=play_engine)

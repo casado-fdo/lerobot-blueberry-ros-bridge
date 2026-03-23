@@ -6,11 +6,10 @@ import time
 import cv2
 from ollama import Client
 from pupil_labs.realtime_api.simple import discover_one_device
-from utils import log_say
+from utils import log_say, init_keyboard_listener
 import sys
 
 import logging
-from pynput import keyboard
 import matplotlib.pyplot as plt
 from pygame import mixer
 
@@ -18,41 +17,6 @@ USER_NAME = "Fernando"
 USER_GENDER = "male"
 DAY_OF_WEEK = "Monday"
 CURRENT_TIME = time.strftime("%H:%M")
-
-def init_keyboard_listener():
-    # Dictionary to store the state of our keys
-    events = {
-        "enter": False,
-        "esc": False,
-        "last_number": None
-    }
-
-    def on_press(key):
-        # Clear the line immediately to prevent echoed characters from showing
-        print("\r\033[K", end='', flush=True) 
-        try:
-            # 1. Detect Numbers 1-4
-            # pynput handles character keys through the .char attribute
-            if hasattr(key, 'char') and key.char in ['1', '2', '3', '4']:
-                events["last_number"] = int(key.char)
-
-            # 2. Detect Arrows/ENTER/ESC
-            elif key == keyboard.Key.right or key == keyboard.Key.enter:
-                events["enter"] = True
-            #elif key == keyboard.Key.left:
-            #    print("Left arrow pressed.")
-            elif key == keyboard.Key.esc:
-                events["esc"] = True
-                return False  # Returning False stops the listener thread
-
-        except Exception as e:
-            print(f"Error: {e}")
-
-    # Start the listener in a non-blocking way
-    listener = keyboard.Listener(on_press=on_press)
-    listener.start()
-
-    return listener, events
 
 class OllamaAssistant:
     """
@@ -81,7 +45,7 @@ class OllamaAssistant:
 
         self.client = Client(host=ollama_host)
         self.ollama_host = ollama_host
-        self.model = "llama3.2-vision"  # options: llava:7b-v1.6-mistral-q2_K, qwen2.5vl:3b, qwen3-vl:2b, qwen3-vl:4b, llama3.2-vision, moondream
+        self.model = "llama3.2-vision"  # options: llava:7b-v1.6-mistral-q2_K, qwen2.5vl:3b, qwen3-vl:2b, qwen3-vl:4b, qwen3.5:9b, ministral-3:14b, llama3.2-vision, moondream
 
         self.setup_prompts()
         self.mode = "describe"
@@ -191,6 +155,7 @@ class OllamaAssistant:
             prompt=prompt,
             images=[image] if image else None,
             stream=False,
+            think=False,
             keep_alive="0",
         )
 

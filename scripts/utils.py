@@ -5,6 +5,7 @@ from kokoro import KPipeline
 import torch
 import soundfile as sf
 import pygame
+from pynput import keyboard
 
 def say(text, engine: str = "gtts"):
     if engine == "gtts":
@@ -80,3 +81,31 @@ def log_say(text: str, play_sounds: bool = True, play_engine: str = "gtts") -> N
     print(f"\n{'='*60}\n🤖 {text}\n{'='*60}\n")
     if play_sounds:
         say(text, engine=play_engine)
+
+def init_keyboard_listener():
+    events = {
+        "enter": False,
+        "esc": False,
+        "last_number": None,
+    }
+
+    def on_press(key):
+        # Clear previous content to keep display neat
+        print("\r\033[K", end="", flush=True)
+        try:
+            if hasattr(key, "char") and key.char in ["1", "2", "3", "4"]:
+                events["last_number"] = int(key.char)
+
+            elif key == keyboard.Key.right or key == keyboard.Key.enter:
+                events["enter"] = True
+
+            elif key == keyboard.Key.esc:
+                events["esc"] = True
+                return False
+
+        except Exception as e:
+            print(f"Keyboard listener error: {e}")
+
+    listener = keyboard.Listener(on_press=on_press)
+    listener.start()
+    return listener, events

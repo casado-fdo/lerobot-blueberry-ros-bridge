@@ -60,7 +60,8 @@ class GazeActionAssistant:
         self.user_name = os.getenv("USER_NAME", "Unknown")
 
         mixer.init()
-        self.waiting_music = None
+        self.waiting_music = mixer.Sound("media/waiting_music.mp3")
+        self.play_engine = "kokoro" if not no_tts else "none"
 
         # Initialise matplotlib plot for displaying frames
         plt.ion()  # Turn on interactive mode
@@ -87,12 +88,12 @@ class GazeActionAssistant:
     @staticmethod
     def execute_pick_bread_to_plate(robot: BlueberryROS):
         # Placeholder: real joint action should come from Robot action dictionary.
-        log_say("Executing action: pick bread to plate. (This is a placeholder implementation.)", play_engine="gtts")
+        log_say("Executing action: pick bread to plate. (This is a placeholder implementation.)", play_engine=self.play_engine)
     
     @staticmethod
     def execute_pick_cube_to_container(robot: BlueberryROS):
         # Placeholder: real joint action should come from Robot action dictionary.
-        log_say("Executing action: pick cube to container. (This is a placeholder implementation.)", play_engine="gtts")
+        log_say("Executing action: pick cube to container. (This is a placeholder implementation.)", play_engine=self.play_engine)
 
     def get_time_of_day(self):
         return datetime.now().strftime("%H:%M")
@@ -138,11 +139,10 @@ class GazeActionAssistant:
         try:
             self.robot.connect()
             self.robot_connected = True
-            log_say("Robot connected. Ready for gaze-assisted actions.", play_engine="gtts")
+            log_say("Robot connected. Ready for gaze-assisted actions.", play_sounds=False)
         except Exception as e:
             self.robot_connected = False
-            print(f"Robot connection warning: {e}")
-            log_say("Could not connect to robot; action execution will be disabled.", play_engine="gtts")
+            log_say(f"Failed to connect to robot: {e}", play_sounds=False)
 
     def update_plot(self, img):
         # 1. Convert BGR to RGB
@@ -186,6 +186,14 @@ class GazeActionAssistant:
         text = response.get("response", "").strip()
         print(f"VLM response: \n {text}")
         return self.parse_vlm_response(text)
+
+    def play_waiting_music(self):
+        if self.waiting_music:
+            self.waiting_music.play(-1).set_volume(0.7)  # Loop indefinitely
+
+    def stop_waiting_music(self):
+        if self.waiting_music:
+            self.waiting_music.fadeout(2000)  # Fade out over 2 seconds
 
     def parse_vlm_response(self, text: str):
         if not text:
@@ -282,11 +290,11 @@ class GazeActionAssistant:
     def run(self):
         self.connect_robot()
 
-        try:
-            log_say("Gaze assistant ready. Look at an object and press Enter to analyze.", play_engine="gtts")
-        except Exception:
-            # TTS may fail in headless environment
-            print("Speak: gaze assistant ready")
+        if self.robot_connected:
+            log_say("Gaze assistant ready. Look at an object and press Enter to analyze.", play_engine=self.play_engine)
+        else:
+            log_say("I cannot communicate with some of my systems. Please ask for human help.", play_engine=self.play_engine)
+            return
 
         print("Press Enter to suggest an action, ESC to quit, 1/2/3 to cycle modes (currently fixed)")
 
@@ -299,12 +307,14 @@ class GazeActionAssistant:
                     user_view = self.get_robot_frame()
 
                     if self.state == "idle":
+                        self.play_waiting_music()
                         encoded_user_view = self.encode_image(user_view)
                         vlm_output = self.query_vlm(self.base_prompt, user_view, encoded_user_view)
+                        self.stop_waiting_music()
 
                         # Speak the message no matter what
                         if not self.no_tts:
-                            log_say(vlm_output["message"], play_engine="gtts")
+                            log_say(vlm_output["message"], play_engine=self.play_engine)
                         else:
                             print(vlm_output["message"])
 
@@ -318,7 +328,7 @@ class GazeActionAssistant:
                                 f"(confidence={vlm_output['confidence']:.2f}). Press Enter to confirm or ESC to cancel."
                             )
                             if not self.no_tts:
-                                log_say(msg, play_engine="gtts")
+                                log_say(msg, play_engine=self.play_engine)
                             else:
                                 print(msg)
                         else:
@@ -331,7 +341,7 @@ class GazeActionAssistant:
                         action_id = self.pending_proposal.get("action_id")
                         success, details = self.execute_action(action_id)
                         if not self.no_tts:
-                            log_say(details, play_engine="gtts")
+                            log_say(details, play_engine=self.play_engine)
                         else:
                             print(details)
                         self.pending_proposal = None
@@ -342,10 +352,10 @@ class GazeActionAssistant:
                     if self.state == "waiting_confirmation":
                         self.pending_proposal = None
                         self.state = "idle"
-                        log_say("Action cancelled. Back to idle.", play_engine="gtts")
+                        log_say("Action cancelled. Back to idle.", play_engine=self.play_engine)
                         continue
 
-                    log_say("Quitting gaze assistant.", play_engine="gtts")
+                    log_say("Quitting gaze assistant.", play_engine=self.play_engine)
                     break
 
                 # Optional: mode selection by number keys

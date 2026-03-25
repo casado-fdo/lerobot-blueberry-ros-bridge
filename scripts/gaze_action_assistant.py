@@ -6,8 +6,8 @@ import sys
 import time
 from datetime import datetime
 import cv2
+import numpy as np
 from ollama import Client
-from pupil_labs.realtime_api.simple import discover_one_device
 from pygame import mixer
 import matplotlib.pyplot as plt
 
@@ -51,13 +51,6 @@ class GazeActionAssistant:
         self.min_confidence = self.clamp(min_confidence, 0.0, 1.0)
 
         self.no_tts = no_tts
-
-        self.device = None
-        self.frame_target_width = 640
-        self.frame_target_height = 480
-        self.raw_width, self.raw_height = 1600, 1200
-        self.matched = None
-        self.base64_frame = None
 
         self.key_listener, self.key_events = init_keyboard_listener()
 
@@ -125,15 +118,21 @@ class GazeActionAssistant:
 
         # Perform substitution (matches {variable_name}) for context variables
         formatted_prompt = template.format(**context_vars)
-        print(f"Formatted prompt: {formatted_prompt}")
         return formatted_prompt
 
-    def initialise_device(self):
-        print("Looking for Pupil Labs Neon device...")
-        self.device = discover_one_device(max_search_duration_seconds=10)
-        if self.device is None:
-            raise SystemExit("Could not find eye-tracking device.")
-        print(f"Connected to device: {self.device}")
+    def get_robot_frame(self):
+        if not self.robot_connected:
+            raise RuntimeError("Robot is not connected; cannot fetch camera frame.")
+
+        obs = self.robot.get_observation()
+        frame = obs.get("user") if isinstance(obs, dict) else None
+        if frame is None:
+            raise RuntimeError("No 'user' camera frame available from robot observation.")
+        if not isinstance(frame, np.ndarray):
+            raise RuntimeError("Robot 'user' camera frame is not a numpy array.")
+        # Frame is rgb but we want bgr for opencv display and encoding
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        return frame
 
     def connect_robot(self):
         try:
@@ -146,7 +145,6 @@ class GazeActionAssistant:
             log_say("Could not connect to robot; action execution will be disabled.", play_engine="gtts")
 
     def update_plot(self, img):
-        
         # 1. Convert BGR to RGB
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         
@@ -163,41 +161,20 @@ class GazeActionAssistant:
         self.fig.canvas.flush_events()
         plt.pause(0.001)
 
-    def process_frame(self):
-        frame, gaze = self.device.receive_matched_scene_video_frame_and_gaze()
-
-        cv2.circle(
-            frame.bgr_pixels,
-            (int(gaze.x), int(gaze.y)),
-            radius=45,
-            color=(0, 0, 255),
-            thickness=8,
-        )
-
-        h, w = self.raw_height, self.raw_width
-        cy1, cy2 = int(h * 0.25), int(h * 0.75)
-        cx1, cx2 = int(w * 0.25), int(w * 0.75)
-
-        roi = frame.bgr_pixels[cy1:cy2, cx1:cx2]
-        self.matched = cv2.resize(roi, (self.frame_target_width, self.frame_target_height), interpolation=cv2.INTER_LINEAR)
-
-        return True
-
-    def encode_image(self):
-        if self.matched is None:
+    def encode_image(self, frame):
+        if frame is None:
             raise RuntimeError("No frame to encode yet")
-        _, buffer = cv2.imencode('.jpg', self.matched)
-        self.base64_frame = base64.b64encode(buffer).decode('utf-8')
+        _, buffer = cv2.imencode('.jpg', frame)
+        return base64.b64encode(buffer).decode('utf-8')
 
-    def query_vlm(self):
-        if self.base64_frame is None:
-            raise RuntimeError("No encoded frame")
+    def query_vlm(self, prompt, user_view=None, encoded_user_view=None):
         try:
-            self.update_plot(self.matched)
+            if user_view is not None:
+                self.update_plot(user_view)
             response = self.client.generate(
                 model=self.model,
-                prompt=self.base_prompt,
-                images=[self.base64_frame],
+                prompt=prompt,
+                images=[encoded_user_view] if encoded_user_view else None,
                 stream=False,
                 think=False,
                 format="json",
@@ -207,7 +184,7 @@ class GazeActionAssistant:
             raise RuntimeError(f"Ollama request failed: {e}")
 
         text = response.get("response", "").strip()
-        print(f"RAW VLM response: {text}")
+        print(f"VLM response: \n {text}")
         return self.parse_vlm_response(text)
 
     def parse_vlm_response(self, text: str):
@@ -303,9 +280,7 @@ class GazeActionAssistant:
             return False, f"Failed to execute {action_id}: {e}"
 
     def run(self):
-        self.initialise_device()
-        #self.connect_robot()
-        self.process_frame() # Warmup
+        self.connect_robot()
 
         try:
             log_say("Gaze assistant ready. Look at an object and press Enter to analyze.", play_engine="gtts")
@@ -321,11 +296,11 @@ class GazeActionAssistant:
                 if self.key_events.get("enter"):
                     self.key_events["enter"] = False
                     
-                    self.process_frame()
+                    user_view = self.get_robot_frame()
 
                     if self.state == "idle":
-                        self.encode_image()
-                        vlm_output = self.query_vlm()
+                        encoded_user_view = self.encode_image(user_view)
+                        vlm_output = self.query_vlm(self.base_prompt, user_view, encoded_user_view)
 
                         # Speak the message no matter what
                         if not self.no_tts:
@@ -340,7 +315,7 @@ class GazeActionAssistant:
                             self.state = "waiting_confirmation"
                             msg = (
                                 f"I propose action {vlm_output['action_id']} "
-                                f"confidence={vlm_output['confidence']:.2f}). Press Enter to confirm or ESC to cancel."
+                                f"(confidence={vlm_output['confidence']:.2f}). Press Enter to confirm or ESC to cancel."
                             )
                             if not self.no_tts:
                                 log_say(msg, play_engine="gtts")
@@ -385,12 +360,6 @@ class GazeActionAssistant:
             print("KeyboardInterrupt: exiting")
 
         finally:
-            if self.device:
-                try:
-                    self.device.close()
-                except Exception:
-                    pass
-
             if self.robot_connected:
                 try:
                     self.robot.disconnect()

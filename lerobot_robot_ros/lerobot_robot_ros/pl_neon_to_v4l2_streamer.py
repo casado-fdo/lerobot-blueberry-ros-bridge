@@ -158,7 +158,7 @@ class NeonV4L2Process:
         )
 
         self._process.start()
-        time.sleep(6.0) # Wait a few seconds to let the stream start
+        time.sleep(7.0) # Wait a few seconds to let the stream start
         logger.info("Neon streaming process started.")
 
     def stop(self, timeout=5):

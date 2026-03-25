@@ -31,15 +31,13 @@ DEFAULT_ACTIONS = {
 
 
 class GazeActionAssistant:
-    MATCH_TYPES = {"exact", "adapted", "none"}
 
     def __init__(
         self,
         ollama_host: str = None,
         actions: dict = None,
         model: str = "qwen3.5:9b",
-        min_exact_confidence: float = 0.75,
-        min_adapted_confidence: float = 0.5,
+        min_confidence: float = 0.75,
         no_tts: bool = False,
     ):
 
@@ -50,8 +48,7 @@ class GazeActionAssistant:
         self.actions = actions or DEFAULT_ACTIONS
         self.action_executor = self.make_action_executor_map(self.actions)
 
-        self.min_exact_confidence = self.clamp(min_exact_confidence, 0.0, 1.0)
-        self.min_adapted_confidence = self.clamp(min_adapted_confidence, 0.0, 1.0)
+        self.min_confidence = self.clamp(min_confidence, 0.0, 1.0)
 
         self.no_tts = no_tts
 
@@ -68,7 +65,6 @@ class GazeActionAssistant:
         self.robot_connected = False
 
         self.user_name = os.getenv("USER_NAME", "Unknown")
-        self.user_gender = os.getenv("USER_GENDER", "Unknown")
 
         mixer.init()
         self.waiting_music = None
@@ -113,10 +109,12 @@ class GazeActionAssistant:
         action_set =  "\n".join(
             [f"- {a['action_id']}: {a['description']}" for a in self.actions.values()]
         )
+        action_ids = [a['action_id'] for a in self.actions.values()]
         context_vars = {
             "time_of_day": self.get_time_of_day(),
             "user_name": self.user_name or 'Unknown',
             "action_set": action_set,
+            "action_ids": action_ids,
         }
         # Debug context
         print(f"Loading prompt '{prompt_id}' with context: {context_vars}")
@@ -231,21 +229,15 @@ class GazeActionAssistant:
                 return self.default_vlm_output(msg, "none", 0.0)
 
         # Validate required fields
-        intent = payload.get("intent")
         obj = payload.get("object")
+        intent = payload.get("intent")
         action_id = payload.get("action_id")
-        match_type = payload.get("match_type")
         confidence = payload.get("confidence")
         message = payload.get("message")
         reasoning = payload.get("reasoning", None)
 
-        if match_type not in self.MATCH_TYPES:
-            message = "I can’t map the match type safely. No action will be performed."
-            return self.default_vlm_output(message, "none", 0.0)
-
-        if action_id is not None and action_id not in self.actions:
-            message = "The proposed action is not from the allowed action list. I will not execute it."
-            return self.default_vlm_output(message, "none", 0.0)
+        if action_id is None or action_id not in self.actions:
+            action_id = "none_detected"
 
         try:
             confidence = float(confidence)
@@ -254,17 +246,13 @@ class GazeActionAssistant:
 
         confidence = self.clamp(confidence, 0.0, 1.0)
 
-        if match_type == "none":
-            action_id = None
-
         if message is None or not isinstance(message, str):
             message = "I can’t generate a safe natural language message, so no action will run."
 
         result = {
-            "intent": intent,
             "object": obj,
+            "intent": intent,
             "action_id": action_id,
-            "match_type": match_type,
             "confidence": confidence,
             "message": message,
             "reasoning": reasoning,
@@ -272,12 +260,11 @@ class GazeActionAssistant:
 
         return result
 
-    def default_vlm_output(self, message, match_type, confidence):
+    def default_vlm_output(self, message, confidence):
         return {
             "intent": None,
             "object": None,
             "action_id": None,
-            "match_type": match_type,
             "confidence": confidence,
             "message": message,
             "reasoning": None,
@@ -285,16 +272,12 @@ class GazeActionAssistant:
 
     def apply_execution_policy(self, vlm_output):
         action_id = vlm_output.get("action_id")
-        match_type = vlm_output.get("match_type")
         confidence = vlm_output.get("confidence", 0.0)
 
         if action_id is None:
             return False
 
-        if match_type == "exact" and confidence >= self.min_exact_confidence:
-            return True
-
-        if match_type == "adapted" and confidence >= self.min_adapted_confidence:
+        if confidence >= self.min_confidence:
             return True
 
         return False
@@ -356,7 +339,7 @@ class GazeActionAssistant:
                             self.pending_proposal = vlm_output
                             self.state = "waiting_confirmation"
                             msg = (
-                                f"I propose action {vlm_output['action_id']} (match_type={vlm_output['match_type']}, "
+                                f"I propose action {vlm_output['action_id']} "
                                 f"confidence={vlm_output['confidence']:.2f}). Press Enter to confirm or ESC to cancel."
                             )
                             if not self.no_tts:
@@ -441,8 +424,7 @@ def main():
     parser.add_argument("--ollama_host", type=str, default=os.getenv("OLLAMA_HOST", "http://localhost:11434"))
     parser.add_argument("--actions_json", type=str, default=None, help="Optional JSON file defining actions.")
     parser.add_argument("--model", type=str, default="qwen3.5:9b")
-    parser.add_argument("--min_exact_confidence", type=float, default=0.75)
-    parser.add_argument("--min_adapted_confidence", type=float, default=0.5)
+    parser.add_argument("--min_confidence", type=float, default=0.75)
     parser.add_argument("--no_tts", action="store_true")
     args = parser.parse_args()
 
@@ -454,8 +436,7 @@ def main():
         ollama_host=args.ollama_host,
         actions=actions,
         model=args.model,
-        min_exact_confidence=args.min_exact_confidence,
-        min_adapted_confidence=args.min_adapted_confidence,
+        min_confidence=args.min_confidence,
         no_tts=args.no_tts,
     )
 

@@ -98,7 +98,7 @@ RUN pip install -e lerobot_teleoperator_ros
 # Copy scripts
 COPY scripts /workspace/scripts/
 
-# Ollama and audio required dependencies
+# Ollama, Kokoro TTS, and related required dependencies
 RUN pip install \
     ollama \
     pydub \
@@ -108,5 +108,6 @@ RUN pip install \
     kokoro \
     soundfile
 RUN apt install -y espeak-ng
+RUN pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
 
 CMD ["/bin/bash"]

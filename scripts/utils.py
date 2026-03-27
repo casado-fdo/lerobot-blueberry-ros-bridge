@@ -78,7 +78,8 @@ def log_say(text: str, play_sounds: bool = True, play_engine: str = "gtts") -> N
         play_sounds (bool): Whether to play the speech audio.
         play_engine (str): The speech engine to use ('gtts' or 'kokoro').
     """
-    print(f"\n{'='*60}\n🤖 {text}\n{'='*60}\n")
+    emoji = "🤖 🔊" if play_sounds else "🤖"
+    print(f"\n{'='*60}\n{emoji} {text}\n{'='*60}\n")
     if play_sounds:
         say(text, engine=play_engine)
 

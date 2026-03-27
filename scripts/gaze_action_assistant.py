@@ -38,7 +38,7 @@ class GazeActionAssistant:
         actions: dict = None,
         model: str = "qwen3.5:9b",
         min_confidence: float = 0.75,
-        no_tts: bool = False,
+        use_tts: bool = True,
     ):
 
         self.ollama_host = ollama_host or os.getenv("OLLAMA_HOST", "http://localhost:11434")
@@ -46,11 +46,10 @@ class GazeActionAssistant:
         self.model = model
 
         self.actions = actions or DEFAULT_ACTIONS
-        self.action_executor = self.make_action_executor_map(self.actions)
 
         self.min_confidence = self.clamp(min_confidence, 0.0, 1.0)
 
-        self.no_tts = no_tts
+        self.use_tts = use_tts
 
         self.key_listener, self.key_events = init_keyboard_listener()
 
@@ -61,7 +60,8 @@ class GazeActionAssistant:
 
         mixer.init()
         self.waiting_music = mixer.Sound("media/waiting_music.mp3")
-        self.play_engine = "kokoro" if not no_tts else "none"
+        self.booting_music = mixer.Sound("media/waiting_music.mp3")
+        self.play_engine = "kokoro" if self.use_tts else "none"
 
         # Initialise matplotlib plot for displaying frames
         plt.ion()  # Turn on interactive mode
@@ -77,23 +77,6 @@ class GazeActionAssistant:
     @staticmethod
     def clamp(value: float, min_val: float, max_val: float) -> float:
         return max(min_val, min(max_val, value))
-
-    @staticmethod
-    def make_action_executor_map(actions):
-        return {
-            "pick_bread_to_plate": GazeActionAssistant.execute_pick_bread_to_plate,
-            "pick_cube_to_container": GazeActionAssistant.execute_pick_cube_to_container,
-        }
-
-    @staticmethod
-    def execute_pick_bread_to_plate(robot: BlueberryROS):
-        # Placeholder: real joint action should come from Robot action dictionary.
-        log_say("Executing action: pick bread to plate. (This is a placeholder implementation.)", play_engine=self.play_engine)
-    
-    @staticmethod
-    def execute_pick_cube_to_container(robot: BlueberryROS):
-        # Placeholder: real joint action should come from Robot action dictionary.
-        log_say("Executing action: pick cube to container. (This is a placeholder implementation.)", play_engine=self.play_engine)
 
     def get_time_of_day(self):
         return datetime.now().strftime("%H:%M")
@@ -189,11 +172,19 @@ class GazeActionAssistant:
 
     def play_waiting_music(self):
         if self.waiting_music:
-            self.waiting_music.play(-1).set_volume(0.7)  # Loop indefinitely
+            self.waiting_music.play(-1).set_volume(0.6)  # Loop indefinitely
 
     def stop_waiting_music(self):
         if self.waiting_music:
             self.waiting_music.fadeout(2000)  # Fade out over 2 seconds
+
+    def play_booting_music(self):
+        if self.booting_music:
+            self.booting_music.play(-1).set_volume(0.6)  # Loop indefinitely
+        
+    def stop_booting_music(self):
+        if self.booting_music:
+            self.booting_music.fadeout(2000)  # Fade out over 2 seconds
 
     def parse_vlm_response(self, text: str):
         if not text:
@@ -259,7 +250,7 @@ class GazeActionAssistant:
         action_id = vlm_output.get("action_id")
         confidence = vlm_output.get("confidence", 0.0)
 
-        if action_id is None:
+        if action_id is None or action_id == 'none_detected':
             return False
 
         if confidence >= self.min_confidence:
@@ -274,29 +265,31 @@ class GazeActionAssistant:
         if action_id not in self.actions:
             return False, "Action not recognized."
 
-        executor = self.action_executor.get(action_id)
-        if executor is None:
-            return False, "Action has no executor mapped."
+        task_description = self.actions[action_id].get("description", None)
+        if task_description is None:
+            return False, "Action has no description available."
 
         if not self.robot_connected:
             return False, "Robot is not connected."
 
         try:
-            executor(self.robot)
+            # Placeholder for now
+            print("PLACEHOLDER: ACTION EXECUTED.")
             return True, f"Executed {action_id} successfully."
         except Exception as e:
             return False, f"Failed to execute {action_id}: {e}"
 
     def run(self):
+        self.play_booting_music()
         self.connect_robot()
-
+        self.stop_booting_music()
         if self.robot_connected:
-            log_say("Gaze assistant ready. Look at an object and press Enter to analyze.", play_engine=self.play_engine)
+            log_say("Gaze assistant ready. Look at an object and press Enter to analyze.", play_sounds=self.use_tts, play_engine=self.play_engine)
         else:
-            log_say("I cannot communicate with some of my systems. Please ask for human help.", play_engine=self.play_engine)
+            log_say("I cannot communicate with some of my systems. Please ask for human help.", play_sounds=self.use_tts, play_engine=self.play_engine)
             return
 
-        print("Press Enter to suggest an action, ESC to quit, 1/2/3 to cycle modes (currently fixed)")
+        print("Press Enter to suggest an action, ESC to quit")
 
         try:
             while True:
@@ -313,24 +306,18 @@ class GazeActionAssistant:
                         self.stop_waiting_music()
 
                         # Speak the message no matter what
-                        if not self.no_tts:
-                            log_say(vlm_output["message"], play_engine=self.play_engine)
-                        else:
-                            print(vlm_output["message"])
+                        log_say(vlm_output["message"], play_sounds=self.use_tts, play_engine=self.play_engine)
 
                         self.session_count += 1
 
                         if self.apply_execution_policy(vlm_output):
                             self.pending_proposal = vlm_output
                             self.state = "waiting_confirmation"
-                            msg = (
+                            log_msg = (
                                 f"I propose action {vlm_output['action_id']} "
                                 f"(confidence={vlm_output['confidence']:.2f}). Press Enter to confirm or ESC to cancel."
                             )
-                            if not self.no_tts:
-                                log_say(msg, play_engine=self.play_engine)
-                            else:
-                                print(msg)
+                            log_say(log_msg, play_sounds=False)
                         else:
                             self.pending_proposal = None
                             self.state = "idle"
@@ -340,10 +327,7 @@ class GazeActionAssistant:
                         assert self.pending_proposal
                         action_id = self.pending_proposal.get("action_id")
                         success, details = self.execute_action(action_id)
-                        if not self.no_tts:
-                            log_say(details, play_engine=self.play_engine)
-                        else:
-                            print(details)
+                        log_say(details, play_sounds=self.use_tts, play_engine=self.play_engine)
                         self.pending_proposal = None
                         self.state = "idle"
 
@@ -352,10 +336,10 @@ class GazeActionAssistant:
                     if self.state == "waiting_confirmation":
                         self.pending_proposal = None
                         self.state = "idle"
-                        log_say("Action cancelled. Back to idle.", play_engine=self.play_engine)
+                        log_say("Action cancelled. Back to idle.", play_sounds=self.use_tts, play_engine=self.play_engine)
                         continue
 
-                    log_say("Quitting gaze assistant.", play_engine=self.play_engine)
+                    log_say("Quitting gaze assistant.", play_sounds=self.use_tts, play_engine=self.play_engine)
                     break
 
                 # Optional: mode selection by number keys
@@ -402,9 +386,9 @@ def main():
     parser = argparse.ArgumentParser(description="Gaze-based assistive action assistant.")
     parser.add_argument("--ollama_host", type=str, default=os.getenv("OLLAMA_HOST", "http://localhost:11434"))
     parser.add_argument("--actions_json", type=str, default=None, help="Optional JSON file defining actions.")
-    parser.add_argument("--model", type=str, default="qwen3.5:9b")
+    parser.add_argument("--model", type=str, default="llama3.2-vision:11b") # "qwen3.5:9b")
     parser.add_argument("--min_confidence", type=float, default=0.75)
-    parser.add_argument("--no_tts", action="store_true")
+    parser.add_argument("--use_tts", type=bool, default=True)
     args = parser.parse_args()
 
     actions = DEFAULT_ACTIONS
@@ -416,7 +400,7 @@ def main():
         actions=actions,
         model=args.model,
         min_confidence=args.min_confidence,
-        no_tts=args.no_tts,
+        use_tts=args.use_tts,
     )
 
     assistant.run()

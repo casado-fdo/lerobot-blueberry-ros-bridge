@@ -8,11 +8,10 @@ from datetime import datetime
 import cv2
 import numpy as np
 from ollama import Client
-from pygame import mixer
 import matplotlib.pyplot as plt
 
 from lerobot_robot_ros import BlueberryROS, BlueberryROSConfig
-from utils import log_say, init_keyboard_listener
+from io_manager import IOManager
 
 
 # Default action set (action_id -> description, constraints optional)
@@ -39,7 +38,16 @@ class GazeActionAssistant:
         model: str = "qwen3.5:9b",
         min_confidence: float = 0.75,
         use_tts: bool = True,
+        use_audio_notifications: bool = True,
     ):
+
+        # I/O setup
+        self.use_tts = use_tts
+        self.use_audio_notifications = use_audio_notifications
+        self.tts_engine = "kokoro" if self.use_tts else "none"
+        self.io = IOManager(audio_enabled=self.use_audio_notifications, tts_engine=self.tts_engine)
+        self.io.play_booting_music()
+
 
         self.ollama_host = ollama_host or os.getenv("OLLAMA_HOST", "http://localhost:11434")
         self.client = Client(host=self.ollama_host)
@@ -49,26 +57,18 @@ class GazeActionAssistant:
 
         self.min_confidence = self.clamp(min_confidence, 0.0, 1.0)
 
-        self.use_tts = use_tts
-
-        self.key_listener, self.key_events = init_keyboard_listener()
-
         self.robot = BlueberryROS(BlueberryROSConfig())
         self.robot_connected = False
 
         self.user_name = os.getenv("USER_NAME", "Unknown")
 
-        mixer.init()
-        self.waiting_music = mixer.Sound("media/waiting_music.mp3")
-        self.booting_music = mixer.Sound("media/waiting_music.mp3")
-        self.play_engine = "kokoro" if self.use_tts else "none"
 
         # Initialise matplotlib plot for displaying frames
         plt.ion()  # Turn on interactive mode
         self.fig, self.ax = plt.subplots()
         self.image_display = None
 
-        self.state = "idle"  # idle, proposed, waiting_confirmation
+        self.state = "idle"  # idle, waiting_confirmation
         self.pending_proposal = None
         self.session_count = 0
 
@@ -122,10 +122,10 @@ class GazeActionAssistant:
         try:
             self.robot.connect()
             self.robot_connected = True
-            log_say("Robot connected. Ready for gaze-assisted actions.", play_sounds=False)
+            self.io.log("Robot connected. Ready for gaze-assisted actions.", speak=False)
         except Exception as e:
             self.robot_connected = False
-            log_say(f"Failed to connect to robot: {e}", play_sounds=False)
+            self.io.log(f"Failed to connect to robot: {e}", speak=False)
 
     def update_plot(self, img):
         # 1. Convert BGR to RGB
@@ -169,22 +169,6 @@ class GazeActionAssistant:
         text = response.get("response", "").strip()
         print(f"VLM response: \n {text}")
         return self.parse_vlm_response(text)
-
-    def play_waiting_music(self):
-        if self.waiting_music:
-            self.waiting_music.play(-1).set_volume(0.6)  # Loop indefinitely
-
-    def stop_waiting_music(self):
-        if self.waiting_music:
-            self.waiting_music.fadeout(2000)  # Fade out over 2 seconds
-
-    def play_booting_music(self):
-        if self.booting_music:
-            self.booting_music.play(-1).set_volume(0.6)  # Loop indefinitely
-        
-    def stop_booting_music(self):
-        if self.booting_music:
-            self.booting_music.fadeout(2000)  # Fade out over 2 seconds
 
     def parse_vlm_response(self, text: str):
         if not text:
@@ -280,73 +264,68 @@ class GazeActionAssistant:
             return False, f"Failed to execute {action_id}: {e}"
 
     def run(self):
-        self.play_booting_music()
         self.connect_robot()
-        self.stop_booting_music()
+
         if self.robot_connected:
-            log_say("Gaze assistant ready. Look at an object and press Enter to analyze.", play_sounds=self.use_tts, play_engine=self.play_engine)
+            self.io.notify(self.io.UPDATE, "Assistant ready. Look at an object and press the Assistance button to analyze.", speak=self.use_tts)
+            self.io.notify(self.io.IDLE)
         else:
-            log_say("I cannot communicate with some of my systems. Please ask for human help.", play_sounds=self.use_tts, play_engine=self.play_engine)
+            self.io.notify(self.io.FAIL, "I cannot communicate with some of my systems. Please ask for human help.", speak=self.use_tts)
             return
 
-        print("Press Enter to suggest an action, ESC to quit")
+        self.io.log("Press the Assistance button to suggest an action, or the Exit button to quit", speak=False)
 
         try:
             while True:
                 # No blocking UI, just event-driven keyboard state.
-                if self.key_events.get("enter"):
-                    self.key_events["enter"] = False
+                if self.io.get_keyboard_events().get("enter"):
+                    self.io.reset_keyboard_events()
                     
                     user_view = self.get_robot_frame()
 
                     if self.state == "idle":
-                        self.play_waiting_music()
+                        self.io.play_waiting_music()
                         encoded_user_view = self.encode_image(user_view)
                         vlm_output = self.query_vlm(self.base_prompt, user_view, encoded_user_view)
-                        self.stop_waiting_music()
-
-                        # Speak the message no matter what
-                        log_say(vlm_output["message"], play_sounds=self.use_tts, play_engine=self.play_engine)
 
                         self.session_count += 1
 
                         if self.apply_execution_policy(vlm_output):
+                            self.io.notify(self.io.SUCCESS, vlm_output["message"], speak=self.use_tts)
                             self.pending_proposal = vlm_output
                             self.state = "waiting_confirmation"
                             log_msg = (
                                 f"I propose action {vlm_output['action_id']} "
-                                f"(confidence={vlm_output['confidence']:.2f}). Press Enter to confirm or ESC to cancel."
+                                f"(confidence={vlm_output['confidence']:.2f})."
                             )
-                            log_say(log_msg, play_sounds=False)
+                            self.io.log(log_msg, speak=False)
+                            self.io.log("Press the Assistance button to confirm or the Exit button to cancel.", speak=False)
+                            self.io.notify(self.io.IDLE)
                         else:
+                            self.io.notify(self.io.FAIL, vlm_output["message"], speak=self.use_tts)
+                            self.io.notify(self.io.IDLE)
                             self.pending_proposal = None
                             self.state = "idle"
-                            print("No eligible action proposal. Returning to idle.")
 
                     elif self.state == "waiting_confirmation":
                         assert self.pending_proposal
                         action_id = self.pending_proposal.get("action_id")
                         success, details = self.execute_action(action_id)
-                        log_say(details, play_sounds=self.use_tts, play_engine=self.play_engine)
+                        self.io.log(details, speak=False)
                         self.pending_proposal = None
                         self.state = "idle"
 
-                if self.key_events.get("esc"):
-                    self.key_events["esc"] = False
+                if self.io.get_keyboard_events().get("esc"):
+                    self.io.reset_keyboard_events()
                     if self.state == "waiting_confirmation":
                         self.pending_proposal = None
                         self.state = "idle"
-                        log_say("Action cancelled. Back to idle.", play_sounds=self.use_tts, play_engine=self.play_engine)
+                        self.io.notify(self.io.UPDATE, "Action cancelled. Back to idle.", speak=self.use_tts)
+                        self.io.notify(self.io.IDLE)
                         continue
 
-                    log_say("Quitting gaze assistant.", play_sounds=self.use_tts, play_engine=self.play_engine)
+                    self.io.notify(self.io.UPDATE, "Quitting assistant.", speak=self.use_tts)
                     break
-
-                # Optional: mode selection by number keys
-                if self.key_events.get("last_number") is not None:
-                    n = self.key_events["last_number"]
-                    self.key_events["last_number"] = None
-                    print(f"Action selection number pressed (not used): {n}")
 
                 time.sleep(0.5)
 
@@ -389,6 +368,7 @@ def main():
     parser.add_argument("--model", type=str, default="llama3.2-vision:11b") # "qwen3.5:9b")
     parser.add_argument("--min_confidence", type=float, default=0.75)
     parser.add_argument("--use_tts", type=bool, default=True)
+    parser.add_argument("--use_audio_notifications", type=bool, default=True)
     args = parser.parse_args()
 
     actions = DEFAULT_ACTIONS

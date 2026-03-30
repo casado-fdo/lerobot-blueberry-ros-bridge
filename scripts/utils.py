@@ -7,6 +7,40 @@ import soundfile as sf
 import pygame
 from pynput import keyboard
 
+class AudioManager:
+    _mixer = None
+    _waiting_track = None
+    _booting_track = None
+    _music_volume = 0.6
+    
+    @classmethod
+    def get_mixer(cls):
+        if cls._mixer is None:
+            cls._mixer = pygame.mixer
+            cls._mixer.init()
+        return cls._mixer
+    
+    @classmethod
+    def get_waiting_track(cls):
+        if cls._waiting_track is None:
+            cls._waiting_track = cls.get_mixer().Sound("media/waiting_music.mp3")
+        return cls._waiting_track
+    
+    @classmethod
+    def get_booting_track(cls):
+        if cls._booting_track is None:
+            cls._booting_track = cls.get_mixer().Sound("media/booting_up.mp3")
+        return cls._booting_track
+
+    @classmethod
+    def set_music_volume(cls, volume: float):
+        cls._music_volume = volume
+        cls.get_mixer().set_volume(cls._music_volume)
+
+    @classmethod
+    def get_music_volume(cls):
+        return cls._music_volume
+
 def say(text, engine: str = "gtts"):
     if engine == "gtts":
         say_gtts(text)
@@ -24,7 +58,7 @@ def say_gtts(text):
         tts.save(temp_file)
 
         # Play the audio file
-        play_sound(temp_file)
+        say_text(temp_file)
         
     except Exception as e:
         # Log any other failure (like gTTS failing to contact Google)
@@ -49,7 +83,7 @@ def say_kokoro(text):
             # Save the output to a file
             output_filename = f"test_output_{i}.wav"
             sf.write(output_filename, audio, 24000)
-            play_sound(output_filename)
+            say_text(output_filename)
     except Exception as e:
         print(f"Failed to create or play audio file: {e}")
     finally:
@@ -57,15 +91,18 @@ def say_kokoro(text):
         if os.path.exists(output_filename):
             os.remove(output_filename)
 
-def play_sound(file_path: str):
+def say_text(file_path: str):
     """
     Plays a sound file using pygame.
     """
     try:
-        pygame.mixer.init()
-        pygame.mixer.music.load(file_path)
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy():
+        mixer = AudioManager.get_mixer()
+        # If anything was being played, stop it with a short fadeout
+        mixer.fadeout(2000)
+        mixer.music.load(file_path)
+        mixer.set_volume(1.0)
+        mixer.music.play()
+        while mixer.music.get_busy():
             pygame.time.Clock().tick(10)
     except Exception as e:
         print(f"Failed to play audio file: {e}")
@@ -110,3 +147,24 @@ def init_keyboard_listener():
     listener = keyboard.Listener(on_press=on_press)
     listener.start()
     return listener, events
+
+def play_waiting_music():
+    AudioManager.get_waiting_track().play(-1) # Loop indefinitely
+    AudioManager.set_music_volume(AudioManager.get_music_volume())
+
+def stop_waiting_music():
+    AudioManager.get_waiting_track().fadeout(2000)  # Fade out over 2 seconds
+
+def play_booting_music():
+    booting_track = AudioManager.get_booting_track()
+    booting_track.set_volume(AudioManager.get_music_volume())
+    booting_track.play(-1, fade_ms=4000)
+    
+def stop_booting_music():
+    AudioManager.get_booting_track().fadeout(2000)  # Fade out over 2 seconds
+
+def enable_audio_notifications():
+    AudioManager.set_music_volume(0.6)
+
+def disable_audio_notifications():
+    AudioManager.set_music_volume(0.0)

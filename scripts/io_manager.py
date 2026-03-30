@@ -2,6 +2,7 @@ import os
 import subprocess
 import logging
 import threading
+import random
 from datetime import datetime
 from typing import Dict, Optional, Callable, Any
 from gtts import gTTS
@@ -37,7 +38,10 @@ class IOManager:
             "custom_events": {}
         }
         self._event_callbacks: Dict[str, Callable] = {}
-        self.audio_dir = "media"
+        self.audio_dir = "media/sound_effects"
+        self.presets_dir = "media/tts_presets"
+
+        random.seed(datetime.now().timestamp())
         
         # Initialize logging
         self._setup_logging()
@@ -151,7 +155,13 @@ class IOManager:
                 os.remove(temp_file)
     
     def _say_kokoro(self, text: str) -> bool:
-        """Use Kokoro TTS for speech synthesis."""
+        """Use Kokoro TTS for speech synthesis or preset audio files."""
+        # Check if text follows preset:code pattern
+        if text.startswith("preset:"):
+            preset_code = text[7:]  # Remove "preset:" prefix
+            return self._play_preset_audio(preset_code)
+        
+        # Use regular Kokoro TTS for non-preset text
         try:
             pipeline = KPipeline(lang_code='a', repo_id='hexgrad/Kokoro-82M', device='cuda')
             voice = 'af_bella'
@@ -168,7 +178,29 @@ class IOManager:
             self.logger.error(f"Kokoro synthesis failed: {e}")
             return False
     
-    def play_audio_file(self, file_path: str) -> bool:
+    def _play_preset_audio(self, preset_code: str) -> bool:
+        """Play a random audio file from the specified preset folder."""
+        preset_dir = os.path.join(self.presets_dir, preset_code)
+        
+        if not os.path.exists(preset_dir):
+            self.logger.error(f"Preset directory not found: {preset_dir}")
+            return False
+        
+        # Get all audio files in the preset directory
+        audio_files = [f for f in os.listdir(preset_dir) if f.endswith(('.wav', '.mp3'))]
+        
+        if not audio_files:
+            self.logger.error(f"No audio files found in preset directory: {preset_dir}")
+            return False
+        
+        # Select a random audio file
+        selected_file = random.choice(audio_files)
+        file_path = os.path.join(preset_dir, selected_file)
+        
+        self.logger.info(f"Playing preset audio: {preset_code} -> {selected_file}")
+        return self.play_audio_file(file_path, volume=0.6)
+    
+    def play_audio_file(self, file_path: str, volume: float = 1.0) -> bool:
         """
         Play an audio file using pygame mixer.
         
@@ -185,6 +217,7 @@ class IOManager:
             mixer = self.get_mixer()
             mixer.fadeout(1000)
             mixer.music.load(file_path)
+            mixer.music.set_volume(volume)
             mixer.music.play()
             while mixer.music.get_busy():
                 pygame.time.Clock().tick(10)
@@ -257,7 +290,6 @@ class IOManager:
                 elif key == keyboard.Key.esc:
                     self._keyboard_events["esc"] = True
                     self._trigger_event("esc")
-                    return False
                 
                 # Handle custom key bindings
                 key_str = str(key).replace('Key.', '') if hasattr(key, 'name') else str(key)
@@ -298,7 +330,9 @@ class IOManager:
     
     def get_keyboard_events(self) -> Dict[str, Any]:
         """Get current keyboard events state."""
-        return self._keyboard_events.copy()
+        events = self._keyboard_events.copy()
+        self.reset_keyboard_events()
+        return events
     
     def reset_keyboard_events(self):
         """Reset keyboard events state."""

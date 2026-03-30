@@ -1,5 +1,0 @@
-You just asked me: "Given that I have some mobility difficulties, briefly tell me what you think my intentions are based on what I am looking at (the red circle)."
-
-I should answer in less than 20 seconds of speaking (max 20 words).
-
-Based on what I see, I should now say: 

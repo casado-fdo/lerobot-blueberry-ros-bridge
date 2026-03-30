@@ -71,8 +71,11 @@ class GazeActionAssistant:
         self.state = "idle"  # idle, waiting_confirmation
         self.pending_proposal = None
         self.session_count = 0
+        self.esc_press_count = 0
+        self.last_esc_time = 0
 
-        self.base_prompt = self.load_prompt("base_behaviour")
+        self.base_prompt = self.load_base_prompt()
+        self.greetings_prompt = self.load_greetings_prompt()
 
     @staticmethod
     def clamp(value: float, min_val: float, max_val: float) -> float:
@@ -81,7 +84,24 @@ class GazeActionAssistant:
     def get_time_of_day(self):
         return datetime.now().strftime("%H:%M")
 
-    def load_prompt(self, prompt_id):
+    def load_greetings_prompt(self):
+        # Define the variables to inject
+        context_vars = {
+            "time_of_day": self.get_time_of_day(),
+            "user_name": self.user_name or 'Unknown',
+        }
+        # Debug context
+        print(f"Loading prompt 'greetings' with context: {context_vars}")
+
+        # Read the prompt file
+        with open(f"scripts/prompts/greetings.txt", "r", encoding="utf-8") as f:
+            template = f.read()
+
+        # Perform substitution (matches {variable_name}) for context variables
+        formatted_prompt = template.format(**context_vars)
+        return formatted_prompt
+
+    def load_base_prompt(self):
         # Define the variables to inject
         action_set =  "\n".join(
             [f"- {a['action_id']}: {a['description']}" for a in self.actions.values()]
@@ -94,10 +114,10 @@ class GazeActionAssistant:
             "action_ids": action_ids,
         }
         # Debug context
-        print(f"Loading prompt '{prompt_id}' with context: {context_vars}")
+        print(f"Loading prompt 'base_behaviour' with context: {context_vars}")
 
         # Read the prompt file
-        with open(f"scripts/prompts/{prompt_id}.txt", "r", encoding="utf-8") as f:
+        with open(f"scripts/prompts/base_behaviour.txt", "r", encoding="utf-8") as f:
             template = f.read()
 
         # Perform substitution (matches {variable_name}) for context variables
@@ -149,6 +169,21 @@ class GazeActionAssistant:
             raise RuntimeError("No frame to encode yet")
         _, buffer = cv2.imencode('.jpg', frame)
         return base64.b64encode(buffer).decode('utf-8')
+
+    def generate_greetings(self):
+        try:
+            response = self.client.generate(
+                    model=self.model,
+                    prompt=self.greetings_prompt,
+                    stream=False,
+                    think=False,
+                    keep_alive=0,
+                )
+        except Exception as e:
+            raise RuntimeError(f"Ollama request failed: {e}")
+        
+        text = response.get("response", "").strip()
+        return text
 
     def query_vlm(self, prompt, user_view=None, encoded_user_view=None):
         try:
@@ -267,20 +302,20 @@ class GazeActionAssistant:
         self.connect_robot()
 
         if self.robot_connected:
-            self.io.notify(self.io.UPDATE, "Assistant ready. Look at an object and press the Assistance button to analyze.", speak=self.use_tts)
+            greetings = self.generate_greetings()
+            self.io.notify(self.io.UPDATE, greetings, speak=self.use_tts)
             self.io.notify(self.io.IDLE)
         else:
-            self.io.notify(self.io.FAIL, "I cannot communicate with some of my systems. Please ask for human help.", speak=self.use_tts)
+            self.io.notify(self.io.FAIL, "preset:error_booting", speak=self.use_tts)
             return
 
         self.io.log("Press the Assistance button to suggest an action, or the Exit button to quit", speak=False)
 
         try:
             while True:
-                # No blocking UI, just event-driven keyboard state.
-                if self.io.get_keyboard_events().get("enter"):
-                    self.io.reset_keyboard_events()
-                    
+                keyboard_events = self.io.get_keyboard_events()
+
+                if keyboard_events.get("enter") and not keyboard_events.get("esc"):                    
                     user_view = self.get_robot_frame()
 
                     if self.state == "idle":
@@ -315,18 +350,27 @@ class GazeActionAssistant:
                         self.pending_proposal = None
                         self.state = "idle"
 
-                if self.io.get_keyboard_events().get("esc"):
-                    self.io.reset_keyboard_events()
+                if keyboard_events.get("esc") and not keyboard_events.get("enter"):
+                    current_time = time.time()
+                    if current_time - self.last_esc_time > 2.0:
+                        self.esc_press_count = 0
+                    
+                    self.esc_press_count += 1
+                    self.last_esc_time = current_time
+                    
                     if self.state == "waiting_confirmation":
                         self.pending_proposal = None
                         self.state = "idle"
-                        self.io.notify(self.io.UPDATE, "Action cancelled. Back to idle.", speak=self.use_tts)
+                        self.io.notify(self.io.UPDATE, "preset:action_cancelled", speak=self.use_tts)
                         self.io.notify(self.io.IDLE)
+                        self.esc_press_count = 0  # Reset ESC count after cancelling
                         continue
 
-                    self.io.notify(self.io.UPDATE, "Quitting assistant.", speak=self.use_tts)
-                    break
-
+                    # Only exit after double ESC press
+                    if self.esc_press_count >= 2:
+                        self.io.notify(self.io.UPDATE, "preset:goodbye", speak=self.use_tts)
+                        break
+                    
                 time.sleep(0.5)
 
         except KeyboardInterrupt:

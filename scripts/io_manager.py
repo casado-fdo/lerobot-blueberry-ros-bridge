@@ -41,6 +41,10 @@ class IOManager:
         self._event_callbacks: Dict[str, Callable] = {}
         self.audio_dir = "media/sound_effects"
         self.presets_dir = "media/tts_presets"
+        if self.tts_engine == "kokoro":
+            self._kokoro_pipeline = KPipeline(lang_code='a', repo_id='hexgrad/Kokoro-82M', device='cuda')
+            self._kokoro_voice = 'af_bella'
+            list(self._kokoro_pipeline("Warming up.", voice=self._kokoro_voice, speed=1))  # consume the generator to actually warm up
 
         random.seed(datetime.now().timestamp())
         
@@ -173,9 +177,7 @@ class IOManager:
         
         # Use regular Kokoro TTS for non-preset text
         try:
-            pipeline = KPipeline(lang_code='a', repo_id='hexgrad/Kokoro-82M', device='cuda')
-            voice = 'af_bella'
-            generator = pipeline(text, voice=voice, speed=1, split_pattern=r'\n+')
+            generator = self._kokoro_pipeline(text, voice=self._kokoro_voice, speed=1, split_pattern=r'\n+')
             
             for i, (gs, ps, audio) in enumerate(generator):
                 output_filename = f"/tmp/kokoro_output_{i}.wav"
@@ -416,6 +418,10 @@ class IOManager:
         self.stop_keyboard_listener()
         self.stop_processing_music()
         self.stop_booting_music()
+        # Clean up Kokoro pipeline
+        if self._kokoro_pipeline is not None:
+            del self._kokoro_pipeline
+            self._kokoro_pipeline = None
         if self._mixer:
             self._mixer.quit()
         self.logger.info("IOManager cleanup completed")

@@ -202,6 +202,11 @@ class GazeActionAssistant:
             raise RuntimeError(f"Ollama request failed: {e}")
 
         text = response.get("response", "").strip()
+        print(f"Prompt tokens: {response.get('prompt_eval_count', 'N/A')}")
+        print(f"Response tokens: {response.get('eval_count', 'N/A')}")
+        total_duration = response.get('total_duration', 'N/A')
+        if total_duration != 'N/A':
+            print(f"Total duration: {total_duration/1e9:.3f} s")
         print(f"VLM response: \n {text}")
         return self.parse_vlm_response(text)
 
@@ -415,7 +420,7 @@ def main():
     parser = argparse.ArgumentParser(description="Gaze-based assistive action assistant.")
     parser.add_argument("--ollama_host", type=str, default=os.getenv("OLLAMA_HOST", "http://localhost:11434"))
     parser.add_argument("--actions_json", type=str, default=None, help="Optional JSON file defining actions.")
-    parser.add_argument("--model", type=str, default="qwen3.5:4b") #"llama3.2-vision:11b") # "qwen3.5:4b")
+    parser.add_argument("--model", type=str, default="qwen3.5:9b") #"llama3.2-vision:11b") # "qwen3.5:4b")
     parser.add_argument("--min_confidence", type=float, default=0.5)
     parser.add_argument("--use_tts", type=bool, default=True)
     parser.add_argument("--use_audio_notifications", type=bool, default=True)

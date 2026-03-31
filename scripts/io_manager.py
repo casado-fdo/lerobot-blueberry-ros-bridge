@@ -27,8 +27,9 @@ class IOManager:
         self.tts_engine = tts_engine
         self.log_file = log_file or f"logs/io_manager_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
         self._mixer = None
-        self._waiting_track = None
+        self._processing_track = None
         self._booting_track = None
+        self._logout_track = None
         self._music_volume = 0.6
         self._keyboard_listener = None
         self._keyboard_events = {
@@ -85,14 +86,14 @@ class IOManager:
             self._init_audio()
         return self._mixer
     
-    def get_waiting_track(self):
-        """Get waiting music track."""
-        if self._waiting_track is None and self.audio_enabled:
+    def get_processing_track(self):
+        """Get processing music track."""
+        if self._processing_track is None and self.audio_enabled:
             try:
-                self._waiting_track = self.get_mixer().Sound(f"{self.audio_dir}/waiting_music.mp3")
+                self._processing_track = self.get_mixer().Sound(f"{self.audio_dir}/processing.mp3")
             except Exception as e:
-                self.logger.error(f"Failed to load waiting track: {e}")
-        return self._waiting_track
+                self.logger.error(f"Failed to load processing track: {e}")
+        return self._processing_track
     
     def get_booting_track(self):
         """Get booting music track."""
@@ -102,6 +103,15 @@ class IOManager:
             except Exception as e:
                 self.logger.error(f"Failed to load booting track: {e}")
         return self._booting_track
+
+    def get_logout_track(self):
+        """Get logout music track."""
+        if self._logout_track is None and self.audio_enabled:
+            try:
+                self._logout_track = self.get_mixer().Sound(f"{self.audio_dir}/booting_up.mp3")
+            except Exception as e:
+                self.logger.error(f"Failed to load logout track: {e}")
+        return self._logout_track
     
     def set_music_volume(self, volume: float):
         """Set music volume (0.0 to 1.0)."""
@@ -215,7 +225,7 @@ class IOManager:
             
         try:
             mixer = self.get_mixer()
-            mixer.fadeout(1000)
+            mixer.stop()
             mixer.music.load(file_path)
             mixer.music.set_volume(volume)
             mixer.music.play()
@@ -340,33 +350,48 @@ class IOManager:
         self._keyboard_events["esc"] = False
         self._keyboard_events["last_number"] = None
     
-    def play_waiting_music(self, loop: bool = True):
-        """Play waiting music."""
+    def play_processing_music(self, loop: bool = True):
+        """Play processing music."""
         if not self.audio_enabled:
             return
         
-        track = self.get_waiting_track()
+        track = self.get_processing_track()
         if track:
             track.play(-1 if loop else 1)
             track.set_volume(self._music_volume)
-            self.logger.info("Waiting music started")
+            self.logger.info("processing music started")
     
-    def stop_waiting_music(self):
-        """Stop waiting music with fadeout."""
-        if self._waiting_track:
-            self._waiting_track.fadeout(2000)
-            self.logger.info("Waiting music stopped")
+    def stop_processing_music(self):
+        """Stop processing music."""
+        if self._processing_track:
+            self._processing_track.stop()
+            self.logger.info("processing music stopped")
     
     def play_booting_music(self, loop: bool = True):
         """Play booting music."""
         if not self.audio_enabled:
-            return
-        
+            return    
         track = self.get_booting_track()
         if track:
             track.set_volume(self._music_volume)
-            track.play(-1 if loop else 1, fade_ms=3000)
+            track.play(-1 if loop else 1, fade_ms=4000)
             self.logger.info("Booting music started")
+
+    def play_logout_music(self): 
+        """Play logout music."""
+        if not self.audio_enabled:
+            return    
+        track = self.get_logout_track()
+        if track:
+            track.set_volume(self._music_volume)
+            track.play(1, fade_ms=2000)
+            self.logger.info("Logout sound played")
+    
+    def stop_logout_music(self):
+        """Stop logout music with fadeout."""
+        if self._logout_track:
+            self._logout_track.fadeout(3000)
+            self.logger.info("Logout music stopped")
     
     def stop_booting_music(self):
         """Stop booting music with fadeout."""
@@ -389,7 +414,7 @@ class IOManager:
     def cleanup(self):
         """Cleanup resources."""
         self.stop_keyboard_listener()
-        self.stop_waiting_music()
+        self.stop_processing_music()
         self.stop_booting_music()
         if self._mixer:
             self._mixer.quit()

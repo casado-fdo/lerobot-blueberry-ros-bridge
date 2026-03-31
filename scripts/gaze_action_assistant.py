@@ -36,7 +36,7 @@ class GazeActionAssistant:
         ollama_host: str = None,
         actions: dict = None,
         model: str = "qwen3.5:9b",
-        min_confidence: float = 0.75,
+        min_confidence: float = 0.5,
         use_tts: bool = True,
         use_audio_notifications: bool = True,
     ):
@@ -177,7 +177,7 @@ class GazeActionAssistant:
                     prompt=self.greetings_prompt,
                     stream=False,
                     think=False,
-                    keep_alive=0,
+                    #keep_alive=0,
                 )
         except Exception as e:
             raise RuntimeError(f"Ollama request failed: {e}")
@@ -196,7 +196,7 @@ class GazeActionAssistant:
                 stream=False,
                 think=False,
                 format="json",
-                keep_alive=0,
+                #keep_alive=0,
             )
         except Exception as e:
             raise RuntimeError(f"Ollama request failed: {e}")
@@ -303,6 +303,8 @@ class GazeActionAssistant:
 
         if self.robot_connected:
             greetings = self.generate_greetings()
+            self.io.stop_booting_music()
+            time.sleep(2.0)
             self.io.notify(self.io.UPDATE, greetings, speak=self.use_tts)
             self.io.notify(self.io.IDLE)
         else:
@@ -319,7 +321,7 @@ class GazeActionAssistant:
                     user_view = self.get_robot_frame()
 
                     if self.state == "idle":
-                        self.io.play_waiting_music()
+                        self.io.play_processing_music()
                         encoded_user_view = self.encode_image(user_view)
                         vlm_output = self.query_vlm(self.base_prompt, user_view, encoded_user_view)
 
@@ -369,6 +371,8 @@ class GazeActionAssistant:
                     # Only exit after double ESC press
                     if self.esc_press_count >= 2:
                         self.io.notify(self.io.UPDATE, "preset:goodbye", speak=self.use_tts)
+                        self.io.play_logout_music()
+                        time.sleep(2.0) # Placeholder for now
                         break
                     
                 time.sleep(0.5)
@@ -377,13 +381,15 @@ class GazeActionAssistant:
             print("KeyboardInterrupt: exiting")
 
         finally:
+            self.io.stop_logout_music()
+            time.sleep(2.0) # Placeholder for now
             if self.robot_connected:
                 try:
                     self.robot.disconnect()
                 except Exception:
                     pass
 
-            print(f"Session interactions: {self.session_count}")
+            
 
 
 def load_actions_from_file(file_path):
@@ -409,8 +415,8 @@ def main():
     parser = argparse.ArgumentParser(description="Gaze-based assistive action assistant.")
     parser.add_argument("--ollama_host", type=str, default=os.getenv("OLLAMA_HOST", "http://localhost:11434"))
     parser.add_argument("--actions_json", type=str, default=None, help="Optional JSON file defining actions.")
-    parser.add_argument("--model", type=str, default="llama3.2-vision:11b") # "qwen3.5:9b")
-    parser.add_argument("--min_confidence", type=float, default=0.75)
+    parser.add_argument("--model", type=str, default="qwen3.5:4b") #"llama3.2-vision:11b") # "qwen3.5:4b")
+    parser.add_argument("--min_confidence", type=float, default=0.5)
     parser.add_argument("--use_tts", type=bool, default=True)
     parser.add_argument("--use_audio_notifications", type=bool, default=True)
     args = parser.parse_args()
@@ -428,7 +434,6 @@ def main():
     )
 
     assistant.run()
-
 
 if __name__ == "__main__":
     main()

@@ -78,16 +78,25 @@ def _neon_stream_loop(
                 out1.write(final_frame_raw)
             
             # Draw gaze on the frame
+            overlay = frame.bgr_pixels.copy()
             cv2.circle(
-                frame.bgr_pixels,
+                overlay,
                 (int(gaze.x), int(gaze.y)),
                 radius=45,
                 color=(0, 0, 255),
                 thickness=8,
             )
-
+            alpha = 0.35
+            alpha_overlay = cv2.addWeighted(
+                overlay,
+                alpha,
+                frame.bgr_pixels,
+                1 - alpha,
+                0,
+            )
+            
             # Crop to central region
-            final_frame_gaze = frame.bgr_pixels[crop_y1:crop_y2, crop_x1:crop_x2]
+            final_frame_gaze = alpha_overlay[crop_y1:crop_y2, crop_x1:crop_x2]
             
             # Resize frame to target resolution
             final_frame_gaze = cv2.resize(final_frame_gaze, (target_width, target_height), interpolation=cv2.INTER_LINEAR)

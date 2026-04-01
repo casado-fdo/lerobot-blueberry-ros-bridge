@@ -102,7 +102,6 @@ class GazeActionAssistant:
         )
         action_ids = [a['action_id'] for a in self.actions.values()]
         context_vars = {
-            "time_of_day": self.get_time_of_day(),
             "user_name": self.user_name or 'Unknown',
             "action_set": action_set,
             "action_ids": action_ids,
@@ -230,7 +229,7 @@ class GazeActionAssistant:
         reasoning = payload.get("reasoning", None)
 
         if action_id is None or action_id not in self.actions:
-            action_id = "none_suggested"
+            action_id = "none"
 
         if message is None or not isinstance(message, str):
             message = "I can’t generate a safe natural language message, so no action will run."
@@ -257,7 +256,7 @@ class GazeActionAssistant:
     def apply_execution_policy(self, vlm_output):
         action_id = vlm_output.get("action_id")
 
-        if action_id is None or action_id == 'none_suggested':
+        if action_id is None or action_id == 'none':
             return False
 
         return True
@@ -331,6 +330,7 @@ class GazeActionAssistant:
                     elif self.state == "waiting_confirmation":
                         assert self.pending_proposal
                         action_id = self.pending_proposal.get("action_id")
+                        self.io.notify(self.io.UPDATE)
                         success, details = self.execute_action(action_id)
                         self.io.log(details, speak=False)
                         self.pending_proposal = None

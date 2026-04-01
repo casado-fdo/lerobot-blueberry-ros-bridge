@@ -5,6 +5,7 @@ import os
 import sys
 import time
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import cv2
 import numpy as np
 from ollama import Client
@@ -33,12 +34,12 @@ class GazeActionAssistant:
 
     def __init__(
         self,
-        ollama_host: str = None,
-        actions: dict = None,
-        model: str = "qwen3.5:9b",
-        min_confidence: float = 0.5,
+        ollama_host: str,
+        actions: dict,
+        model: str,
         use_tts: bool = True,
         use_audio_notifications: bool = True,
+        user_name: str = "Unknown",
     ):
 
         # I/O setup
@@ -49,18 +50,17 @@ class GazeActionAssistant:
         self.io.play_booting_music()
 
 
-        self.ollama_host = ollama_host or os.getenv("OLLAMA_HOST", "http://localhost:11434")
+        self.ollama_host = ollama_host
+        print(f"Connecting to Ollama at {self.ollama_host}")
         self.client = Client(host=self.ollama_host)
         self.model = model
 
         self.actions = actions or DEFAULT_ACTIONS
 
-        self.min_confidence = self.clamp(min_confidence, 0.0, 1.0)
-
         self.robot = BlueberryROS(BlueberryROSConfig())
         self.robot_connected = False
 
-        self.user_name = os.getenv("USER_NAME", "Unknown")
+        self.user_name = user_name
 
 
         # Initialise matplotlib plot for displaying frames
@@ -82,7 +82,7 @@ class GazeActionAssistant:
         return max(min_val, min(max_val, value))
 
     def get_time_of_day(self):
-        return datetime.now().strftime("%H:%M")
+        return datetime.now(ZoneInfo("Europe/London")).strftime("%H:%M")
 
     def load_greetings_prompt(self):
         # Define the variables to inject
@@ -212,7 +212,7 @@ class GazeActionAssistant:
 
     def parse_vlm_response(self, text: str):
         if not text:
-            return self.default_vlm_output("Empty model response", "none", 0.0)
+            return self.default_vlm_output("Empty model response")
 
         # Extract JSON from free text if there is surrounding text.
         try:
@@ -226,25 +226,22 @@ class GazeActionAssistant:
                 payload = json.loads(text)
             except Exception:
                 msg = "I couldn't parse your response correctly, so I will not propose an action."
-                return self.default_vlm_output(msg, "none", 0.0)
+                return self.default_vlm_output(msg)
 
         # Validate required fields
         obj = payload.get("object")
         intent = payload.get("intent")
         action_id = payload.get("action_id")
-        confidence = payload.get("confidence")
+        certainty = payload.get("certainty")
         message = payload.get("message")
         reasoning = payload.get("reasoning", None)
 
         if action_id is None or action_id not in self.actions:
-            action_id = "none_detected"
+            action_id = "none_suggested"
 
-        try:
-            confidence = float(confidence)
-        except Exception:
-            confidence = 0.0
-
-        confidence = self.clamp(confidence, 0.0, 1.0)
+        # Parse certainty value. It should be high, medium or low
+        if certainty not in ["high", "medium", "low"]:
+            certainty = "low"
 
         if message is None or not isinstance(message, str):
             message = "I can’t generate a safe natural language message, so no action will run."
@@ -253,31 +250,31 @@ class GazeActionAssistant:
             "object": obj,
             "intent": intent,
             "action_id": action_id,
-            "confidence": confidence,
+            "certainty": certainty,
             "message": message,
             "reasoning": reasoning,
         }
 
         return result
 
-    def default_vlm_output(self, message, confidence):
+    def default_vlm_output(self, message):
         return {
             "intent": None,
             "object": None,
             "action_id": None,
-            "confidence": confidence,
+            "certainty": "low",
             "message": message,
             "reasoning": None,
         }
 
     def apply_execution_policy(self, vlm_output):
         action_id = vlm_output.get("action_id")
-        confidence = vlm_output.get("confidence", 0.0)
+        certainty = vlm_output.get("certainty", "low")
 
-        if action_id is None or action_id == 'none_detected':
+        if action_id is None or action_id == 'none_suggested':
             return False
 
-        if confidence >= self.min_confidence:
+        if certainty == "high":
             return True
 
         return False
@@ -338,7 +335,7 @@ class GazeActionAssistant:
                             self.state = "waiting_confirmation"
                             log_msg = (
                                 f"I propose action {vlm_output['action_id']} "
-                                f"(confidence={vlm_output['confidence']:.2f})."
+                                f"(certainty={vlm_output['certainty']})."
                             )
                             self.io.log(log_msg, speak=False)
                             self.io.log("Press the Assistance button to confirm or the Exit button to cancel.", speak=False)
@@ -377,7 +374,7 @@ class GazeActionAssistant:
                     if self.esc_press_count >= 2:
                         self.io.notify(self.io.UPDATE, "preset:goodbye", speak=self.use_tts)
                         self.io.play_logout_music()
-                        time.sleep(2.0) # Placeholder for now
+                        time.sleep(3.0) # Placeholder for now
                         break
                     
                 time.sleep(0.5)
@@ -419,11 +416,11 @@ def load_actions_from_file(file_path):
 def main():
     parser = argparse.ArgumentParser(description="Gaze-based assistive action assistant.")
     parser.add_argument("--ollama_host", type=str, default=os.getenv("OLLAMA_HOST", "http://localhost:11434"))
-    parser.add_argument("--actions_json", type=str, default=None, help="Optional JSON file defining actions.")
-    parser.add_argument("--model", type=str, default="qwen3.5:9b") #"llama3.2-vision:11b") # "qwen3.5:4b")
-    parser.add_argument("--min_confidence", type=float, default=0.5)
-    parser.add_argument("--use_tts", type=bool, default=True)
-    parser.add_argument("--use_audio_notifications", type=bool, default=True)
+    parser.add_argument("--actions_json", type=str, default=None)
+    parser.add_argument("--model", type=str, default=os.getenv("OLLAMA_MODEL", "qwen3.5:9b")) #"llama3.2-vision:11b") # "qwen3.5:4b")
+    parser.add_argument("--use_tts", type=bool, default=os.getenv("USE_TTS", "true").lower() == "true")
+    parser.add_argument("--use_audio_notifications", type=bool, default=os.getenv("USE_AUDIO_NOTIFICATIONS", "true").lower() == "true")
+    parser.add_argument("--user_name", type=str, default=os.getenv("USER_NAME", "Unknown"))
     args = parser.parse_args()
 
     actions = DEFAULT_ACTIONS
@@ -434,8 +431,9 @@ def main():
         ollama_host=args.ollama_host,
         actions=actions,
         model=args.model,
-        min_confidence=args.min_confidence,
         use_tts=args.use_tts,
+        use_audio_notifications=args.use_audio_notifications,
+        user_name=args.user_name,
     )
 
     assistant.run()

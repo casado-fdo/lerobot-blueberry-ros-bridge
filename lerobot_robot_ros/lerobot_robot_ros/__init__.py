@@ -1,2 +1,3 @@
 from .config_blueberry import BlueberryROSConfig
 from .robot_blueberry import BlueberryROS
+from .inference_blueberry import BlueberryInference

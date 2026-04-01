@@ -1,0 +1,12 @@
+{
+    "pick_bread_to_plate": {
+        "action_id": "pick_bread_to_plate",
+        "description": "Pick the sandwich bread and place it on the plate.",
+        "constraints": "Only use when bread is in reachable area and plate is present."
+    },
+    "pick_cube_to_container": {
+        "action_id": "pick_cube_to_container",
+        "description": "Pick the cube and place it into the container.",
+        "constraints": "Only use when cube and container are visible and unobstructed."
+    }
+}

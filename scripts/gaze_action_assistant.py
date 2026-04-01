@@ -15,27 +15,12 @@ from lerobot_robot_ros import BlueberryROS, BlueberryROSConfig
 from io_manager import IOManager
 
 
-# Default action set (action_id -> description, constraints optional)
-DEFAULT_ACTIONS = {
-    "pick_bread_to_plate": {
-        "action_id": "pick_bread_to_plate",
-        "description": "Pick the sandwich bread and place it on the plate.",
-        "constraints": "Only use when bread is in reachable area and plate is present."
-    },
-    "pick_cube_to_container": {
-        "action_id": "pick_cube_to_container",
-        "description": "Pick the cube and place it into the container.",
-        "constraints": "Only use when cube and container are visible and unobstructed."
-    },
-}
-
-
 class GazeActionAssistant:
 
     def __init__(
         self,
         ollama_host: str,
-        actions: dict,
+        actions_json: str,
         model: str,
         use_tts: bool = True,
         use_audio_notifications: bool = True,
@@ -51,17 +36,12 @@ class GazeActionAssistant:
 
 
         self.ollama_host = ollama_host
-        print(f"Connecting to Ollama at {self.ollama_host}")
         self.client = Client(host=self.ollama_host)
         self.model = model
-
-        self.actions = actions or DEFAULT_ACTIONS
-
+        self.actions = self.load_actions_from_file(actions_json)
         self.robot = BlueberryROS(BlueberryROSConfig())
         self.robot_connected = False
-
         self.user_name = user_name
-
 
         # Initialise matplotlib plot for displaying frames
         plt.ion()  # Turn on interactive mode
@@ -74,15 +54,29 @@ class GazeActionAssistant:
         self.esc_press_count = 0
         self.last_esc_time = 0
 
-        self.base_prompt = self.load_base_prompt()
+        self.base_prompt = self.load_fpv_assistance_prompt()
         self.greetings_prompt = self.load_greetings_prompt()
-
-    @staticmethod
-    def clamp(value: float, min_val: float, max_val: float) -> float:
-        return max(min_val, min(max_val, value))
 
     def get_time_of_day(self):
         return datetime.now(ZoneInfo("Europe/London")).strftime("%H:%M")
+
+    def load_actions_from_file(self, file_path):
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Action definition file not found: {file_path}")
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        structured = {}
+        for k, v in data.items():
+            if isinstance(v, str):
+                structured[k] = {"action_id": k, "description": v}
+            elif isinstance(v, dict):
+                structured[k] = {"action_id": k, "description": v.get("description", ""), "constraints": v.get("constraints")}
+            else:
+                raise ValueError(f"Unsupported action format for {k}: {v}")
+
+        return structured
 
     def load_greetings_prompt(self):
         # Define the variables to inject
@@ -94,14 +88,14 @@ class GazeActionAssistant:
         print(f"Loading prompt 'greetings' with context: {context_vars}")
 
         # Read the prompt file
-        with open(f"scripts/prompts/greetings.txt", "r", encoding="utf-8") as f:
+        with open(f"prompts/greetings.txt", "r", encoding="utf-8") as f:
             template = f.read()
 
         # Perform substitution (matches {variable_name}) for context variables
         formatted_prompt = template.format(**context_vars)
         return formatted_prompt
 
-    def load_base_prompt(self):
+    def load_fpv_assistance_prompt(self):
         # Define the variables to inject
         action_set =  "\n".join(
             [f"- {a['action_id']}: {a['description']}" for a in self.actions.values()]
@@ -114,10 +108,10 @@ class GazeActionAssistant:
             "action_ids": action_ids,
         }
         # Debug context
-        print(f"Loading prompt 'base_behaviour' with context: {context_vars}")
+        print(f"Loading prompt 'fpv_assistance' with context: {context_vars}")
 
         # Read the prompt file
-        with open(f"scripts/prompts/base_behaviour.txt", "r", encoding="utf-8") as f:
+        with open(f"prompts/fpv_assistance.txt", "r", encoding="utf-8") as f:
             template = f.read()
 
         # Perform substitution (matches {variable_name}) for context variables
@@ -232,16 +226,11 @@ class GazeActionAssistant:
         obj = payload.get("object")
         intent = payload.get("intent")
         action_id = payload.get("action_id")
-        certainty = payload.get("certainty")
         message = payload.get("message")
         reasoning = payload.get("reasoning", None)
 
         if action_id is None or action_id not in self.actions:
             action_id = "none_suggested"
-
-        # Parse certainty value. It should be high, medium or low
-        if certainty not in ["high", "medium", "low"]:
-            certainty = "low"
 
         if message is None or not isinstance(message, str):
             message = "I can’t generate a safe natural language message, so no action will run."
@@ -250,7 +239,6 @@ class GazeActionAssistant:
             "object": obj,
             "intent": intent,
             "action_id": action_id,
-            "certainty": certainty,
             "message": message,
             "reasoning": reasoning,
         }
@@ -262,22 +250,17 @@ class GazeActionAssistant:
             "intent": None,
             "object": None,
             "action_id": None,
-            "certainty": "low",
             "message": message,
             "reasoning": None,
         }
 
     def apply_execution_policy(self, vlm_output):
         action_id = vlm_output.get("action_id")
-        certainty = vlm_output.get("certainty", "low")
 
         if action_id is None or action_id == 'none_suggested':
             return False
 
-        if certainty == "high":
-            return True
-
-        return False
+        return True
 
     def execute_action(self, action_id):
         if not action_id:
@@ -334,8 +317,7 @@ class GazeActionAssistant:
                             self.pending_proposal = vlm_output
                             self.state = "waiting_confirmation"
                             log_msg = (
-                                f"I propose action {vlm_output['action_id']} "
-                                f"(certainty={vlm_output['certainty']})."
+                                f"I propose action {vlm_output['action_id']}."
                             )
                             self.io.log(log_msg, speak=False)
                             self.io.log("Press the Assistance button to confirm or the Exit button to cancel.", speak=False)
@@ -391,45 +373,20 @@ class GazeActionAssistant:
                 except Exception:
                     pass
 
-            
-
-
-def load_actions_from_file(file_path):
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Action definition file not found: {file_path}")
-
-    with open(file_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    structured = {}
-    for k, v in data.items():
-        if isinstance(v, str):
-            structured[k] = {"action_id": k, "description": v}
-        elif isinstance(v, dict):
-            structured[k] = {"action_id": k, "description": v.get("description", ""), "constraints": v.get("constraints")}
-        else:
-            raise ValueError(f"Unsupported action format for {k}: {v}")
-
-    return structured
-
 
 def main():
     parser = argparse.ArgumentParser(description="Gaze-based assistive action assistant.")
     parser.add_argument("--ollama_host", type=str, default=os.getenv("OLLAMA_HOST", "http://localhost:11434"))
-    parser.add_argument("--actions_json", type=str, default=None)
+    parser.add_argument("--actions_json", type=str, default="prompts/robot_actions.json")
     parser.add_argument("--model", type=str, default=os.getenv("OLLAMA_MODEL", "qwen3.5:9b")) #"llama3.2-vision:11b") # "qwen3.5:4b")
     parser.add_argument("--use_tts", type=bool, default=os.getenv("USE_TTS", "true").lower() == "true")
     parser.add_argument("--use_audio_notifications", type=bool, default=os.getenv("USE_AUDIO_NOTIFICATIONS", "true").lower() == "true")
     parser.add_argument("--user_name", type=str, default=os.getenv("USER_NAME", "Unknown"))
     args = parser.parse_args()
 
-    actions = DEFAULT_ACTIONS
-    if args.actions_json:
-        actions = load_actions_from_file(args.actions_json)
-
     assistant = GazeActionAssistant(
         ollama_host=args.ollama_host,
-        actions=actions,
+        actions_json=args.actions_json,
         model=args.model,
         use_tts=args.use_tts,
         use_audio_notifications=args.use_audio_notifications,

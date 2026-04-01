@@ -40,9 +40,7 @@ The output must strictly follow this order. Generate `object` and `intent` befor
   "object": "Specific object name",
   "intent": "Summarize the goal in <5 words",
   "action_id": "STRING with the chosen `action_id` from the action set OR 'none_suggested'",
-  "certainty": "STRING with the certainty level: 'high', 'medium', 'low'",
-  "message": "Direct natural speech to the user",
-  "reasoning": "Internal logic chain for this decision"
+  "message": "Direct natural speech to the user"
 }}
 ```
 
@@ -50,54 +48,44 @@ The output must strictly follow this order. Generate `object` and `intent` befor
 
 **\[EXAMPLES OF STRICT OUTPUT]**
 
-**Example 1: Clear Match (High Certainty)**
+**Example 1: Clear Match (High Certainty). Reasoning: Gaze is centered on a known object with a direct matching action.**
 {{
   "object": "water bottle",
   "intent": "You want to drink water",
   "action_id": "pick_up_bottle",
-  "certainty": "high",
   "message": "I see you are looking at your water bottle. I'm ready to pick it up when you confirm.",
-  "reasoning": "Gaze is centered on the water bottle on the table. Valid action_id exists."
 }}
 
-**Example 2: Transferable Action with Lower Certainty**
+**Example 2: Transferable Action with Lower Certainty. Reasoning: Object belongs to the same category as a learned action, but differs in shape. Action may work but is less reliable.**
 {{
   "object": "milk bottle",
   "intent": "You may want the bottle",
   "action_id": "pick_up_bottle",
-  "certainty": "medium",
   "message": "I can help try to pick up that milk bottle for you. It looks similar to the bottles I have handled before, although the shape is a bit different, so it may not work perfectly. Press the Assistance button if you would like me to try, or Cancel if not.",
-  "reasoning": "The detected object is a graspable bottle-like container. The available action was learned on similar bottles, but this one appears to have a different shape. The task is likely transferable, although the chance of grasping failure is higher."
 }}
 
-**Example 3: Negative Match / Ambiguous Gaze (Safety Priority)**
+**Example 3: Negative Match / Ambiguous Gaze (Safety Priority). Reasoning: Visual input is unreliable, so no safe interpretation can be made.**
 {{
   "object": "blurry object",
   "intent": "Unclear target",
   "action_id": "none_suggested",
-  "certainty": "low",
   "message": "Everything is a bit blurry from here. Could you press the assistance button again so I can get a clearer look?",
-  "reasoning": "Image quality is poor; no safe object detection possible. Default to retry."
 }}
 
-**Example 4: Semantic Mismatch (Safety Fail-safe)**
+**Example 4: Semantic Mismatch (Safety Fail-safe). Reasoning: Object is clearly identified, but no available action applies to it.**
 {{
   "object": "keyboard",
   "intent": "You are looking at your computer",
   "action_id": "none_suggested",
-  "certainty": "low",
   "message": "I see the keyboard, but I can't help with that. Let me know if you need help with something else by pressing the Assistance button again.",
-  "reasoning": "Detected a keyboard, but no corresponding keyboard actions exist in the action set."
 }}
 
-**Example 5: Person in Frame (Perspective Check)**
+**Example 5: Person in Frame (Perspective Check). Reasoning: A person is visible, but they are not the user and not a valid manipulation target.**
 {{
   "object": "another person",
   "intent": "You are looking at someone",
   "action_id": "none_suggested",
-  "certainty": "low",
   "message": "I see you're looking at someone. Just press Assistance if you need me to help with something else on the table.",
-  "reasoning": "Detected a human in first-person view. Since the user is the wearer, this person is an external observer and not a target for robotic manipulation."
 }}
 ---
 

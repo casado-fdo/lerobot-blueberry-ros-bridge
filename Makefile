@@ -30,6 +30,7 @@ start:
 		-v ${XAUTH}:${XAUTH} \
 		-v ./data:/data \
 		-v ./media:/workspace/media \
+		-v ./prompts:/workspace/prompts \
 		-v ./lerobot_robot_ros:/workspace/lerobot_robot_ros \
 		-v ./lerobot_teleoperator_ros:/workspace/lerobot_teleoperator_ros \
 		-v ./scripts:/workspace/scripts \

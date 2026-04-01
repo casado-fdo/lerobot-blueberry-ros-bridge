@@ -36,7 +36,11 @@ class IOManager:
             "enter": False,
             "esc": False,
             "last_number": None,
-            "custom_events": {}
+            "assist": False,
+            "cancel": False,
+            "exit_early": False,
+            "rerecord_episode": False,
+            "stop_recording": False
         }
         self._event_callbacks: Dict[str, Callable] = {}
         self.audio_dir = "media/sound_effects"
@@ -295,13 +299,29 @@ class IOManager:
                     self._trigger_event(f"number_{key.char}")
                 
                 # Handle special keys
-                elif key == keyboard.Key.right or key == keyboard.Key.enter:
+                elif key == keyboard.Key.enter or key == keyboard.Key.space or key == keyboard.Key.right:
                     self._keyboard_events["enter"] = True
+                    self._keyboard_events["assist"] = True
+                    self._keyboard_events["exit_early"] = True
                     self._trigger_event("enter")
+                    self._trigger_event("assist")
+                    self._trigger_event("exit_early")
+                
+                elif key == keyboard.Key.left:
+                    self._keyboard_events["rerecord_episode"] = True
+                    self._keyboard_events["exit_early"] = True
+                    self._trigger_event("rerecord_episode")
+                    self._trigger_event("exit_early")
                 
                 elif key == keyboard.Key.esc:
                     self._keyboard_events["esc"] = True
+                    self._keyboard_events["cancel"] = True
+                    self._keyboard_events["stop_recording"] = True
+                    self._keyboard_events["exit_early"] = True
                     self._trigger_event("esc")
+                    self._trigger_event("cancel")
+                    self._trigger_event("stop_recording")
+                    self._trigger_event("exit_early")
                 
                 # Handle custom key bindings
                 key_str = str(key).replace('Key.', '') if hasattr(key, 'name') else str(key)
@@ -342,15 +362,19 @@ class IOManager:
     
     def get_keyboard_events(self) -> Dict[str, Any]:
         """Get current keyboard events state."""
-        events = self._keyboard_events.copy()
-        self.reset_keyboard_events()
+        events = self._keyboard_events
         return events
     
     def reset_keyboard_events(self):
         """Reset keyboard events state."""
         self._keyboard_events["enter"] = False
         self._keyboard_events["esc"] = False
+        self._keyboard_events["assist"] = False
+        self._keyboard_events["cancel"] = False
         self._keyboard_events["last_number"] = None
+        self._keyboard_events["exit_early"] = False
+        self._keyboard_events["rerecord_episode"] = False
+        self._keyboard_events["stop_recording"] = False
     
     def play_processing_music(self, loop: bool = True):
         """Play processing music."""

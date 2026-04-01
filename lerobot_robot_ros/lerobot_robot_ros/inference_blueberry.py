@@ -1,5 +1,7 @@
 # !/usr/bin/env python
 
+import logging
+import numpy as np
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.processor import make_default_processors
 from lerobot.policies.act.modeling_act import ACTPolicy
@@ -10,6 +12,8 @@ from lerobot.scripts.lerobot_record import record_loop
 from .robot_blueberry import BlueberryROS
 from .config_blueberry import BlueberryROSConfig
 from huggingface_hub import HfApi
+
+logger = logging.getLogger(__name__)
 
 class BlueberryInference:
     """
@@ -25,10 +29,11 @@ class BlueberryInference:
 
         # Initialize the robot and connect to it
         self.robot = BlueberryROS(BlueberryROSConfig()) # default config
-        self.robot.connect()
-
-        if not self.robot.is_connected: 
-            raise ValueError("Robot is not connected!")
+        try:
+            self.connect_to_robot()
+        except Exception as e:
+            logger.error(f"Failed to connect to robot: {e}")
+            raise
 
         # Fetch model metadata
         self.model_info = HfApi().model_info(self.hf_policy_repo_id)
@@ -44,8 +49,7 @@ class BlueberryInference:
         # Load model and processors
         self.teleop_action_processor, self.robot_action_processor, self.robot_observation_processor = make_default_processors()
         self.policy = self.load_model(self.policy_type, self.hf_policy_repo_id)
-        self.preprocessor, self.postprocessor = self.build_policy_processors(self.policy, self.hf_policy_repo_id, self.dataset)        
-        
+        self.preprocessor, self.postprocessor = self.build_policy_processors(self.policy, self.hf_policy_repo_id, self.dataset)              
 
     def get_summary(self):
         summary_msg = f"- Policy: {self.hf_policy_repo_id}\n"
@@ -53,6 +57,15 @@ class BlueberryInference:
         summary_msg += f"- Dataset: {self.hf_dataset_repo_id}\n"
         summary_msg += f"- FPS: {self.fps}"
         return summary_msg
+
+    def connect_to_robot(self):
+        try:
+            self.robot.connect()
+            self.robot_connected = True
+            logger.info("Robot connected. Ready for gaze-assisted actions.")
+        except Exception as e:
+            self.robot_connected = False
+            logger.error(f"Failed to connect to robot: {e}")
 
     def load_model(self, hf_policy_type: str, hf_policy_id: str):
         if hf_policy_type.lower() == "act":
@@ -81,6 +94,18 @@ class BlueberryInference:
             preprocessor_overrides={"device_processor": {"device": str(policy.config.device)}},
         )
         return preprocessor, postprocessor
+
+    def get_latest_fpv_frame(self):
+        if not self.robot.is_connected:
+            raise RuntimeError("Robot is not connected; cannot fetch camera frame.")
+
+        obs = self.robot.get_observation()
+        frame = obs.get("user") if isinstance(obs, dict) else None
+        if frame is None:
+            raise RuntimeError("No 'user' camera frame available from robot observation.")
+        if not isinstance(frame, np.ndarray):
+            raise RuntimeError("Robot 'user' camera frame is not a numpy array.")
+        return frame
 
     def run_inference_loop(self, events, episode_time_sec, task_description):
         record_loop(
@@ -111,7 +136,10 @@ class BlueberryInference:
             robot_action_processor=self.robot_action_processor,
             robot_observation_processor=self.robot_observation_processor,
         )
-
+    
+    def is_connected(self):
+        return self.robot.is_connected
+    
     def disconnect(self):
         self.robot.disconnect()
 

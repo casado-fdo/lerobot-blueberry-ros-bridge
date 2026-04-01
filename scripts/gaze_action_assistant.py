@@ -10,8 +10,7 @@ import cv2
 import numpy as np
 from ollama import Client
 import matplotlib.pyplot as plt
-
-from lerobot_robot_ros import BlueberryROS, BlueberryROSConfig
+from lerobot_robot_ros import BlueberryInference
 from io_manager import IOManager
 
 
@@ -19,9 +18,15 @@ class GazeActionAssistant:
 
     def __init__(
         self,
+        hf_username: str,
+        hf_policy_id: str,
+        hf_dataset_id: str,
+        fps: int,
+        episode_time_sec: int,
+        reset_time_sec: int,
         ollama_host: str,
         actions_json: str,
-        model: str,
+        ollama_model: str,
         use_tts: bool = True,
         use_audio_notifications: bool = True,
         user_name: str = "Unknown",
@@ -34,16 +39,19 @@ class GazeActionAssistant:
         self.io = IOManager(audio_enabled=self.use_audio_notifications, tts_engine=self.tts_engine)
         self.io.play_booting_music()
 
-
+        # Ollama setup
         self.ollama_host = ollama_host
         self.client = Client(host=self.ollama_host)
-        self.model = model
-        self.actions = self.load_actions_from_file(actions_json)
-        self.robot = BlueberryROS(BlueberryROSConfig())
-        self.robot_connected = False
+        self.ollama_model = ollama_model
         self.user_name = user_name
+        self.actions = self.load_actions_from_file(actions_json)
+        
+        # Robot interface setup
+        self.blueberry_infer = BlueberryInference(hf_username, hf_policy_id, hf_dataset_id, fps)
+        self.episode_time_sec = episode_time_sec
+        self.reset_time_sec = reset_time_sec
 
-        # Initialise matplotlib plot for displaying frames
+        # Initialise matplotlib plot for displaying frames (debug)
         plt.ion()  # Turn on interactive mode
         self.fig, self.ax = plt.subplots()
         self.image_display = None
@@ -52,7 +60,7 @@ class GazeActionAssistant:
         self.pending_proposal = None
         self.session_count = 0
         self.esc_press_count = 0
-        self.last_esc_time = 0
+        self.last_cancel_time = 0
 
         self.base_prompt = self.load_fpv_assistance_prompt()
         self.greetings_prompt = self.load_greetings_prompt()
@@ -118,27 +126,13 @@ class GazeActionAssistant:
         return formatted_prompt
 
     def get_robot_frame(self):
-        if not self.robot_connected:
-            raise RuntimeError("Robot is not connected; cannot fetch camera frame.")
-
-        obs = self.robot.get_observation()
-        frame = obs.get("user") if isinstance(obs, dict) else None
-        if frame is None:
-            raise RuntimeError("No 'user' camera frame available from robot observation.")
-        if not isinstance(frame, np.ndarray):
-            raise RuntimeError("Robot 'user' camera frame is not a numpy array.")
+        try:
+            frame = self.blueberry_infer.get_latest_fpv_frame()
+        except Exception as e:
+            raise RuntimeError(f"Failed to get robot frame: {e}")
         # Frame is rgb but we want bgr for opencv display and encoding
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
         return frame
-
-    def connect_robot(self):
-        try:
-            self.robot.connect()
-            self.robot_connected = True
-            self.io.log("Robot connected. Ready for gaze-assisted actions.", speak=False)
-        except Exception as e:
-            self.robot_connected = False
-            self.io.log(f"Failed to connect to robot: {e}", speak=False)
 
     def update_plot(self, img):
         # 1. Convert BGR to RGB
@@ -166,7 +160,7 @@ class GazeActionAssistant:
     def generate_greetings(self):
         try:
             response = self.client.generate(
-                    model=self.model,
+                    model=self.ollama_model,
                     prompt=self.greetings_prompt,
                     stream=False,
                     think=False,
@@ -183,7 +177,7 @@ class GazeActionAssistant:
             if user_view is not None:
                 self.update_plot(user_view)
             response = self.client.generate(
-                model=self.model,
+                model=self.ollama_model,
                 prompt=prompt,
                 images=[encoded_user_view] if encoded_user_view else None,
                 stream=False,
@@ -261,7 +255,7 @@ class GazeActionAssistant:
 
         return True
 
-    def execute_action(self, action_id):
+    def execute_action(self, keyboard_events, action_id):
         if not action_id:
             return False, "No action id to execute."
 
@@ -272,20 +266,25 @@ class GazeActionAssistant:
         if task_description is None:
             return False, "Action has no description available."
 
-        if not self.robot_connected:
+        if not self.blueberry_infer.is_connected():
             return False, "Robot is not connected."
 
         try:
-            # Placeholder for now
-            print("PLACEHOLDER: ACTION EXECUTED.")
+            self.io.log(f"Executing action {action_id} with task description: {task_description}", speak=False)
+            self.io.reset_keyboard_events()
+            self.blueberry_infer.run_inference_loop(self.io.get_keyboard_events(), self.episode_time_sec, task_description)
+            self.io.reset_keyboard_events()
+            self.io.log("Resetting environment...", speak=False)
+            time.sleep(self.reset_time_sec)
             return True, f"Executed {action_id} successfully."
         except Exception as e:
             return False, f"Failed to execute {action_id}: {e}"
 
     def run(self):
-        self.connect_robot()
-
-        if self.robot_connected:
+        if self.blueberry_infer.is_connected():
+            summary_msg = "Robot connected and ready for assistance:\n"
+            summary_msg += self.blueberry_infer.get_summary()
+            self.io.log(summary_msg, speak=False)
             greetings = self.generate_greetings()
             self.io.stop_booting_music()
             time.sleep(2.0)
@@ -301,7 +300,8 @@ class GazeActionAssistant:
             while True:
                 keyboard_events = self.io.get_keyboard_events()
 
-                if keyboard_events.get("enter") and not keyboard_events.get("esc"):                    
+                if keyboard_events.get("assist") and not keyboard_events.get("cancel"): 
+                    self.io.reset_keyboard_events()                   
                     user_view = self.get_robot_frame()
 
                     if self.state == "idle":
@@ -331,32 +331,32 @@ class GazeActionAssistant:
                         assert self.pending_proposal
                         action_id = self.pending_proposal.get("action_id")
                         self.io.notify(self.io.UPDATE)
-                        success, details = self.execute_action(action_id)
+                        success, details = self.execute_action(keyboard_events, action_id)
                         self.io.log(details, speak=False)
                         self.pending_proposal = None
                         self.state = "idle"
 
-                if keyboard_events.get("esc") and not keyboard_events.get("enter"):
+                elif keyboard_events.get("cancel") and not keyboard_events.get("assist"):
+                    self.io.reset_keyboard_events()
                     current_time = time.time()
-                    if current_time - self.last_esc_time > 2.0:
-                        self.esc_press_count = 0
+                    if current_time - self.last_cancel_time > 2.0:
+                        self.cancel_press_count = 0
                     
-                    self.esc_press_count += 1
-                    self.last_esc_time = current_time
+                    self.cancel_press_count += 1
+                    self.last_cancel_time = current_time
                     
                     if self.state == "waiting_confirmation":
                         self.pending_proposal = None
                         self.state = "idle"
                         self.io.notify(self.io.UPDATE, "preset:action_cancelled", speak=self.use_tts)
                         self.io.notify(self.io.IDLE)
-                        self.esc_press_count = 0  # Reset ESC count after cancelling
+                        self.cancel_press_count = 0  # Reset cancel count after cancelling
                         continue
 
-                    # Only exit after double ESC press
-                    if self.esc_press_count >= 2:
+                    # Only exit after double cancel press
+                    if self.cancel_press_count >= 2:
                         self.io.notify(self.io.UPDATE, "preset:goodbye", speak=self.use_tts)
                         self.io.play_logout_music()
-                        time.sleep(3.0) # Placeholder for now
                         break
                     
                 time.sleep(0.5)
@@ -366,28 +366,42 @@ class GazeActionAssistant:
 
         finally:
             self.io.stop_logout_music()
-            time.sleep(2.0) # Placeholder for now
-            if self.robot_connected:
+            if self.blueberry_infer.is_connected():
                 try:
-                    self.robot.disconnect()
+                    self.blueberry_infer.disconnect()
                 except Exception:
                     pass
 
 
 def main():
     parser = argparse.ArgumentParser(description="Gaze-based assistive action assistant.")
+    # OLLAMA
     parser.add_argument("--ollama_host", type=str, default=os.getenv("OLLAMA_HOST", "http://localhost:11434"))
     parser.add_argument("--actions_json", type=str, default="prompts/robot_actions.json")
-    parser.add_argument("--model", type=str, default=os.getenv("OLLAMA_MODEL", "qwen3.5:9b")) #"llama3.2-vision:11b") # "qwen3.5:4b")
+    parser.add_argument("--ollama_model", type=str, default=os.getenv("OLLAMA_MODEL", "qwen3.5:9b")) #"llama3.2-vision:11b") # "qwen3.5:4b")
+    # HRI
     parser.add_argument("--use_tts", type=bool, default=os.getenv("USE_TTS", "true").lower() == "true")
     parser.add_argument("--use_audio_notifications", type=bool, default=os.getenv("USE_AUDIO_NOTIFICATIONS", "true").lower() == "true")
     parser.add_argument("--user_name", type=str, default=os.getenv("USER_NAME", "Unknown"))
+    # LeRobot
+    parser.add_argument("--policy_id", type=str, default=os.getenv("HUGGINGFACE_MODEL_NAME", "your-policy-id-here"), help="HuggingFace policy name to evaluate")
+    parser.add_argument("--dataset_id", type=str, default=None, help="HuggingFace dataset name to use for stats")
+    parser.add_argument("--fps", type=int, default=int(os.getenv("RECORDING_FPS", "30")), help="Frames per second for evaluation (default: 30)")
+    parser.add_argument("--episode_time_sec", type=int, default=int(os.getenv("RECORDING_EPISODE_TIME_SEC", "10")), help="Duration of each episode in seconds (default: 10)")
+    parser.add_argument("--reset_time_sec", type=int, default=int(os.getenv("RECORDING_RESET_TIME_SEC", "5")), help="Time to reset between episodes in seconds (default: 5)")
+    parser.add_argument("--hf_username", type=str, default=os.getenv("HUGGINGFACE_USERNAME", "your-username-here"), help="HuggingFace username (default: your-username-here)")
     args = parser.parse_args()
 
     assistant = GazeActionAssistant(
+        hf_username=args.hf_username,
+        hf_policy_id=args.policy_id,
+        hf_dataset_id=args.dataset_id,
+        fps=args.fps,
+        episode_time_sec=args.episode_time_sec,
+        reset_time_sec=args.reset_time_sec,
         ollama_host=args.ollama_host,
         actions_json=args.actions_json,
-        model=args.model,
+        ollama_model=args.ollama_model,
         use_tts=args.use_tts,
         use_audio_notifications=args.use_audio_notifications,
         user_name=args.user_name,

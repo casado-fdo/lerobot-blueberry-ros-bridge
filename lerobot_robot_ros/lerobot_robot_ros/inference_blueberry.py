@@ -95,7 +95,7 @@ class BlueberryInference:
         )
         return preprocessor, postprocessor
 
-    def get_latest_fpv_frame(self):
+    def get_latest_fpv_frame(self, desired_height: int = None, desired_width: int = None):
         if not self.robot.is_connected:
             raise RuntimeError("Robot is not connected; cannot fetch camera frame.")
 
@@ -105,6 +105,9 @@ class BlueberryInference:
             raise RuntimeError("No 'user' camera frame available from robot observation.")
         if not isinstance(frame, np.ndarray):
             raise RuntimeError("Robot 'user' camera frame is not a numpy array.")
+        
+        if desired_height is not None and desired_width is not None and frame.shape[:2] != (desired_height, desired_width):
+            frame = cv2.resize(frame, (desired_width, desired_height))
         return frame
 
     def run_inference_loop(self, events, episode_time_sec, task_description):

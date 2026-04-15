@@ -8,7 +8,7 @@ from lerobot.scripts.lerobot_record import record_loop
 from lerobot.processor import make_default_processors
 from lerobot.utils.constants import ACTION, OBS_STR
 from lerobot.configs.types import PolicyFeature, FeatureType
-from utils import log_say
+from io_manager import IOManager
 import time, os
 import rerun as rr
 import traceback
@@ -28,7 +28,9 @@ HF_REPO_ID = f"{HF_USERNAME}/{HF_DATASET_NAME}"
 
 
 def main():
-    log_say("Initialising data collection...", play_sounds=True)
+    # I/O setup
+    io = IOManager(audio_enabled=PLAY_SOUNDS, tts_engine="gtts")
+    io.notify(io.UPDATE, "Initialising data collection...")
 
     # Create the robot and teleoperator configurations
     robot_config = BlueberryROSConfig() # default config
@@ -58,7 +60,7 @@ def main():
     try:
         dataset = LeRobotDataset(repo_id=HF_REPO_ID)
     except:
-        log_say(f"Dataset {HF_REPO_ID} does not exist. Creating a new one.", play_sounds=False)
+        io.log(f"Dataset {HF_REPO_ID} does not exist. Creating a new one.", speak=False)
         dataset = LeRobotDataset.create(
             repo_id=HF_REPO_ID,
             root=folder_name,
@@ -66,8 +68,9 @@ def main():
             features=dataset_features,
             robot_type=robot.name,
             use_videos=True,
-            image_writer_processes=3,
-            image_writer_threads=5,
+            image_writer_processes=0,
+            image_writer_threads=16,
+            streaming_ecoding=True
         )
 
     # Connect the robot and teleoperator
@@ -82,12 +85,12 @@ def main():
     if not robot.is_connected or not teleop.is_connected:
         raise ValueError("Robot or teleop is not connected!")
 
-    log_say("Starting recording loop...", play_sounds=PLAY_SOUNDS)
+    io.notify(io.UPDATE, "Starting recording loop...")
     episode_idx = dataset.num_episodes
     num_episodes = NUM_EPISODES + episode_idx
     try:
         while episode_idx < num_episodes and not events["stop_recording"]:
-            log_say(f"Recording episode {episode_idx + 1} out of {num_episodes}", play_sounds=PLAY_SOUNDS)
+            io.notify(io.UPDATE, f"Recording episode {episode_idx + 1} out of {num_episodes}")
 
             record_loop(
                 robot=robot,
@@ -106,7 +109,7 @@ def main():
 
             # Reset the environment if not stopping or re-recording
             if not events["stop_recording"] and (episode_idx < num_episodes - 1 or events["rerecord_episode"]):
-                log_say("Reset the environment", play_sounds=PLAY_SOUNDS)
+                io.notify(io.UPDATE, "Reset the environment")
                 record_loop(
                     robot=robot,
                     events=events,
@@ -122,7 +125,7 @@ def main():
                 )
 
             if events["rerecord_episode"]:
-                log_say("Re-recording episode", play_sounds=PLAY_SOUNDS)
+                io.notify(io.UPDATE, "Re-recording episode")
                 events["rerecord_episode"] = False
                 events["exit_early"] = False
                 dataset.clear_episode_buffer()
@@ -131,11 +134,11 @@ def main():
             dataset.save_episode()
             episode_idx += 1
     except Exception as e:
-        log_say(f"An error occurred", play_sounds=PLAY_SOUNDS)
+        io.notify(io.FAIL, "An error occurred")
         print(traceback.format_exc())
         
     # Clean up
-    log_say("Stop recording", play_sounds=PLAY_SOUNDS)
+    io.notify(io.UPDATE, "Stop recording")
     dataset.finalize()
     dataset.push_to_hub()
 

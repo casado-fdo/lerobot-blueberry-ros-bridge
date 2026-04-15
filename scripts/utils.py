@@ -107,19 +107,6 @@ def say_text(file_path: str):
     except Exception as e:
         print(f"Failed to play audio file: {e}")
 
-def log_say(text: str, play_sounds: bool = True, play_engine: str = "gtts") -> None:
-    """Logs the given text and optionally plays it as speech.
-
-    Args:
-        text (str): The text to log and speak.
-        play_sounds (bool): Whether to play the speech audio.
-        play_engine (str): The speech engine to use ('gtts' or 'kokoro').
-    """
-    emoji = "🤖 🔊" if play_sounds else "🤖"
-    print(f"\n{'='*60}\n{emoji} {text}\n{'='*60}\n")
-    if play_sounds:
-        say(text, engine=play_engine)
-
 def init_keyboard_listener():
     events = {
         "enter": False,

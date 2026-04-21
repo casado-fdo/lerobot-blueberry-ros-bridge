@@ -69,8 +69,7 @@ def main():
             robot_type=robot.name,
             use_videos=True,
             image_writer_processes=0,
-            image_writer_threads=16,
-            streaming_ecoding=True
+            image_writer_threads=16
         )
 
     # Connect the robot and teleoperator
@@ -90,6 +89,7 @@ def main():
     num_episodes = NUM_EPISODES + episode_idx
     try:
         while episode_idx < num_episodes and not events["stop_recording"]:
+            time.sleep(3)
             io.notify(io.UPDATE, f"Recording episode {episode_idx + 1} out of {num_episodes}")
 
             record_loop(

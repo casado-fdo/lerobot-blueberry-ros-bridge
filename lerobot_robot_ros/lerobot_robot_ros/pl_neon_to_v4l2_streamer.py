@@ -15,7 +15,7 @@ def _neon_stream_loop(
     target_height,
     v4l2_device0,
     v4l2_device1 = None,
-    crop_keep_ratio=0.4,        # How much of the image to keep (0-1)
+    crop_keep_ratio=0.5,        # How much of the image to keep (0-1)
     vertical_offset_ratio=0.2,  # Vertical bias (0 = very top, 0.5 = centre)
     search_timeout=10,
 ):
@@ -128,7 +128,7 @@ class NeonV4L2Process:
         fps=15,
         target_width=320,
         target_height=240,
-        crop_keep_ratio=0.45,
+        crop_keep_ratio=0.5,
         vertical_offset_ratio=0.25,
         search_timeout=10,
     ):

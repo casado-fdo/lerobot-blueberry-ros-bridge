@@ -44,9 +44,17 @@ class BlueberryROS(Robot):
             f"{motor}.effort": float for motor in self.config.blueberry_joint_names
         }    
 
+    @property
+    def _gaze_features_ft(self) -> dict[str, type]:
+        return {
+            "gaze.x": float,
+            "gaze.y": float,
+            "gaze.valid": float,
+        }
+
     @cached_property
     def observation_features(self) -> dict[str, type | tuple]:
-        return {**self._robot_state_ft, **self._cameras_ft}
+        return {**self._robot_state_ft, **self._cameras_ft, **self._gaze_features_ft}
  
     @cached_property
     def action_features(self) -> dict[str, type]:
@@ -112,6 +120,21 @@ class BlueberryROS(Robot):
                 obs_dict[cam_key] = None
             dt_ms = (time.perf_counter() - start) * 1e3
             logger.debug(f"{self}: {cam_key} read in {dt_ms:.2f} ms")
+
+        # Get latest gaze coordinates and validity mask
+        start = time.perf_counter()
+        try:
+            gaze_x, gaze_y, gaze_valid = self.pl_neon_streamer.get_latest_gaze()
+            obs_dict["gaze.x"] = gaze_x
+            obs_dict["gaze.y"] = gaze_y
+            obs_dict["gaze.valid"] = gaze_valid
+        except Exception as e:
+            obs_dict["gaze.x"] = 0.0
+            obs_dict["gaze.y"] = 0.0
+            obs_dict["gaze.valid"] = 0
+            logger.debug(f"{self}: Failed to get gaze data: {e}")
+        dt_ms = (time.perf_counter() - start) * 1e3
+        logger.debug(f"{self}: gaze data read in {dt_ms:.2f} ms")
 
         return obs_dict
 

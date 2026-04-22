@@ -19,6 +19,9 @@ def _neon_stream_loop(
     crop_keep_ratio=0.5,        # How much of the image to keep (0-1)
     vertical_offset_ratio=0.1,  # Vertical bias (0 = very top, 0.5 = centre)
     search_timeout=10,
+    gaze_x_shared=None,
+    gaze_y_shared=None,
+    gaze_valid_shared=None,
 ):
     pl_device = None
     out0 = None
@@ -71,6 +74,26 @@ def _neon_stream_loop(
             
             # Get the next video frame and gaze data
             frame, gaze = pl_device.receive_matched_scene_video_frame_and_gaze()
+            
+            # Store latest gaze coordinates (scaled to resized frame)
+            if gaze_x_shared is not None and gaze_y_shared is not None and gaze_valid_shared is not None and gaze is not None:
+                # Scale gaze coordinates to match the resized raw frame
+                scale_x = target_width / RAW_WIDTH
+                scale_y = target_height / RAW_HEIGHT
+                gaze_x_scaled = gaze.x * scale_x
+                gaze_y_scaled = gaze.y * scale_y
+                
+                gaze_x_shared.value = gaze_x_scaled
+                gaze_y_shared.value = gaze_y_scaled
+                gaze_valid_shared.value = 1
+            else:
+                # No valid gaze data available
+                if gaze_x_shared is not None:
+                    gaze_x_shared.value = 0.0
+                if gaze_y_shared is not None:
+                    gaze_y_shared.value = 0.0
+                if gaze_valid_shared is not None:
+                    gaze_valid_shared.value = 0
 
             if v4l2_device1 is not None:
                 # Create a copy of the frame, resize it and write it to the second V4L2 device (raw data)
@@ -144,6 +167,11 @@ class NeonV4L2Process:
 
         self._stop_event = mp.Event()
         self._process = None
+        
+        # Shared memory for latest gaze coordinates and validity mask
+        self._gaze_x_shared = mp.Value('d', 0.0)  # 0 indicates no data
+        self._gaze_y_shared = mp.Value('d', 0.0)
+        self._gaze_valid_shared = mp.Value('i', 0)  # Integer validity mask (0=false, 1=true)
 
     def start(self):
         if self._process is not None and self._process.is_alive():
@@ -163,6 +191,9 @@ class NeonV4L2Process:
                 self.crop_keep_ratio,
                 self.vertical_offset_ratio,
                 self.search_timeout,
+                self._gaze_x_shared,
+                self._gaze_y_shared,
+                self._gaze_valid_shared,
             ),
             daemon=True,
         )
@@ -185,3 +216,13 @@ class NeonV4L2Process:
             self._process.join()
 
         self._process = None
+
+    def get_latest_gaze(self) -> tuple[float, float, int]:
+        """Get the latest gaze coordinates and validity mask.
+        
+        Returns:
+            Tuple of (gaze_x, gaze_y, gaze_valid) where:
+            - gaze_x, gaze_y: scaled pixel coordinates matching the resized raw frame (0 if invalid)
+            - gaze_valid: integer mask (0=invalid, 1=valid) indicating if gaze data is valid
+        """
+        return (self._gaze_x_shared.value, self._gaze_y_shared.value, self._gaze_valid_shared.value)

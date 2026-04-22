@@ -142,7 +142,7 @@ def main():
                 dataset.clear_episode_buffer()
                 continue
 
-            dataset.save_episode()
+            dataset.save_episode(parallel_encoding=False)
             episode_idx += 1
             time.sleep(1.5)
     except Exception as e:

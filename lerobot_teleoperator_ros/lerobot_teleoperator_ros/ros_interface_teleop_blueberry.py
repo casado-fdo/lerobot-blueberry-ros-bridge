@@ -1,6 +1,7 @@
 import numpy as np
 import rospy
 import os
+import time
 from geometry_msgs.msg import TwistStamped
 from std_msgs.msg import Int32MultiArray, Float32MultiArray
 
@@ -15,6 +16,7 @@ class BlueberryTeleopROSInterface():
         left_hand_topic: str = None, 
         right_hand_topic: str = None,
         base_topic: str = None,
+        device_timeout_sec: float = 1.0,
     ):
         # Initialize ROS node
         if not rospy.get_node_uri():
@@ -35,6 +37,14 @@ class BlueberryTeleopROSInterface():
         self.last_r_hand_pos_command.data = [0.] * 6
         self.last_base_joy_command = Float32MultiArray()
         self.last_base_joy_command.data = [0.] * 2
+        
+        # Device health monitoring
+        self.device_timeout_sec = device_timeout_sec
+        self.last_l_arm_time = 0.0
+        self.last_r_arm_time = 0.0
+        self.last_l_hand_time = 0.0
+        self.last_r_hand_time = 0.0
+        self.last_base_time = 0.0
 
     def get_latest_data(self) -> np.ndarray:
         # Return the latest data as a numpy array
@@ -65,27 +75,52 @@ class BlueberryTeleopROSInterface():
     def l_arm_teleop_callback(self, data):
         # Get the position and orientation of the end effector
         self.last_l_arm_vel_command = data
+        self.last_l_arm_time = time.time()
     
 
     def r_arm_teleop_callback(self, data):
         # Get the position and orientation of the end effector
         self.last_r_arm_vel_command = data
+        self.last_r_arm_time = time.time()
 
 
     def l_hand_teleop_callback(self, data):
         # Get the position for each of the fingers
         self.last_l_hand_pos_command = data
+        self.last_l_hand_time = time.time()
 
 
     def r_hand_teleop_callback(self, data):
         # Get the position for each of the fingers
-        self.last_r_hand_pos_command = data        
+        self.last_r_hand_pos_command = data
+        self.last_r_hand_time = time.time()        
         
 
     def base_teleop_callback(self, data):
         # Get the base joy command
         self.last_base_joy_command = data
+        self.last_base_time = time.time()
         
+    def is_device_alive(self) -> bool:
+        """Check if the device (Leap Motion controller) is still alive and responsive.
+        
+        Returns:
+            bool: True if any teleoperation topic has received data within the timeout period, False otherwise.
+        """
+        current_time = time.time()
+        
+        # Check if any of the teleoperation topics have received recent data
+        # We consider the device alive if ANY of the following topics has recent activity
+        if (current_time - self.last_l_arm_time < self.device_timeout_sec or
+            current_time - self.last_r_arm_time < self.device_timeout_sec or
+            current_time - self.last_l_hand_time < self.device_timeout_sec or
+            current_time - self.last_r_hand_time < self.device_timeout_sec):
+            return True
+        
+        return False
+    
     def stop(self):
         # Stop the interface
         rospy.signal_shutdown("Blueberry Teleoperation ROS Interface stopped.")
+
+    

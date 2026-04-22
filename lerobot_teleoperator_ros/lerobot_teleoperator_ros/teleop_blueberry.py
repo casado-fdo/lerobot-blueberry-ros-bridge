@@ -57,6 +57,7 @@ class BlueberryTeleop(Teleoperator):
             left_hand_topic=self.config.left_hand_topic,
             right_hand_topic=self.config.right_hand_topic,
             base_topic=self.config.base_topic,
+            device_timeout_sec=self.config.device_timeout_sec,
         )
 
     def get_action(self) -> dict[str, Any]:

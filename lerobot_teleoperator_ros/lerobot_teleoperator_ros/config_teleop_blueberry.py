@@ -11,3 +11,4 @@ class BlueberryTeleopConfig(TeleoperatorConfig):
     left_hand_topic: str = "/left_hand/teleop_cmd"
     right_hand_topic: str = "/right_hand/teleop_cmd"
     base_topic: str = "/base/teleop_cmd"
+    device_timeout_sec: float = 1.0

@@ -3,6 +3,7 @@ import time
 import multiprocessing as mp
 from pupil_labs.realtime_api.simple import discover_one_device
 import logging
+import numpy as np
 
 RAW_WIDTH = 1600
 RAW_HEIGHT = 1200
@@ -86,7 +87,7 @@ def _neon_stream_loop(
                 color=(0, 0, 255),
                 thickness=8,
             )
-            alpha = 0.45
+            alpha = 0.5
             alpha_overlay = cv2.addWeighted(
                 overlay,
                 alpha,

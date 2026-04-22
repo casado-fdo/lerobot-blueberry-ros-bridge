@@ -89,7 +89,18 @@ def main():
     num_episodes = NUM_EPISODES + episode_idx
     try:
         while episode_idx < num_episodes and not events["stop_recording"]:
-            time.sleep(3)
+            # Wait for teleop device to be alive before starting episode
+            teleop_wait_logged = False
+            while not teleop.ros_interface.is_device_alive():
+                if not teleop_wait_logged:
+                    io.log("Waiting for teleoperation data to be available...")
+                    teleop_wait_logged = True
+                time.sleep(0.5)
+                if events["stop_recording"]:
+                    break
+            if events["stop_recording"]:
+                break
+                
             io.notify(io.UPDATE, f"Recording episode {episode_idx + 1} out of {num_episodes}")
 
             record_loop(
@@ -133,6 +144,7 @@ def main():
 
             dataset.save_episode()
             episode_idx += 1
+            time.sleep(1.5)
     except Exception as e:
         io.notify(io.FAIL, "An error occurred")
         print(traceback.format_exc())

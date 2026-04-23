@@ -127,7 +127,7 @@ class GazeActionAssistant:
 
     def get_robot_frame(self):
         try:
-            frame = self.blueberry_infer.get_latest_fpv_frame(desired_height=240, desired_width=320)
+            frame = self.blueberry_infer.get_latest_fpv_frame(desired_height=240, desired_width=320, display_gaze=True)
         except Exception as e:
             raise RuntimeError(f"Failed to get robot frame: {e}")
         # Frame is rgb but we want bgr for opencv display and encoding

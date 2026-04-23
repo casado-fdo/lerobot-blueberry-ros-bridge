@@ -22,7 +22,8 @@ class BlueberryROSConfig(RobotConfig):
     cam_height = int(os.getenv("RECORDING_VIDEO_HEIGHT", "240")) #  720, 540, 480, 240
     cam_fps = int(os.getenv("RECORDING_FPS", "15"))
     rs_fps = 30 if cam_width == 320 else cam_fps # The realsense can only run at 5, 30 or 60 fps in 320x240 resolution
-    record_raw_user_cam = os.getenv("RECORDING_RAW_USER_CAM", "false").lower() == "true"
+    record_user_cam = os.getenv("RECORDING_USER_CAM", "true").lower() == "true"
+    record_user_gaze_cam = os.getenv("RECORDING_USER_GAZE_CAM", "false").lower() == "true"
 
     # Cameras configuration
     left_camera_config = RealSenseCameraConfig(
@@ -54,7 +55,7 @@ class BlueberryROSConfig(RobotConfig):
         backend=Cv2Backends.V4L2,
         warmup_s=1,
     )
-    user_raw_camera_config = OpenCVCameraConfig(
+    user_gaze_camera_config = OpenCVCameraConfig(
         index_or_path='/dev/video21',
         fps=cam_fps,
         width=cam_width,  
@@ -67,8 +68,9 @@ class BlueberryROSConfig(RobotConfig):
         default_factory=lambda: {
             "left": BlueberryROSConfig.left_camera_config, 
             "right": BlueberryROSConfig.right_camera_config,
-            "user": BlueberryROSConfig.user_camera_config,
-            **({"user_raw": BlueberryROSConfig.user_raw_camera_config} if BlueberryROSConfig.record_raw_user_cam else {}),
+            **({"user": BlueberryROSConfig.user_camera_config} if 
+            BlueberryROSConfig.record_user_cam else {}),
+            **({"user_gaze": BlueberryROSConfig.user_gaze_camera_config} if BlueberryROSConfig.record_user_gaze_cam else {}),
         })
     
     

@@ -38,7 +38,7 @@ def _neon_stream_loop(
 
         logger.info(f"NeonV4L2Process: Connecting to {pl_device}...")
 
-        # Compute crop coordinates
+        # Compute crop coordinates for central region
         crop_width = int(RAW_WIDTH * crop_keep_ratio)
         crop_height = int(RAW_HEIGHT * crop_keep_ratio)
         crop_x1 = (RAW_WIDTH - crop_width) // 2
@@ -64,9 +64,9 @@ def _neon_stream_loop(
             raise RuntimeError("Failed to open VideoWriter.")
 
         if v4l2_device1 is not None:
-            logger.info(f"NeonV4L2Process: VideoWriter opened successfully, writing to {v4l2_device0} and {v4l2_device1}")
+            logger.info(f"NeonV4L2Process: VideoWriter opened successfully, writing frames to {v4l2_device0} (main) and {v4l2_device1} (gaze-annotated)")
         else:
-            logger.info(f"NeonV4L2Process: VideoWriter opened successfully, writing to {v4l2_device0}")
+            logger.info(f"NeonV4L2Process: VideoWriter opened successfully, writing frames to {v4l2_device0}")
 
         cv2.setNumThreads(1)
 
@@ -75,19 +75,34 @@ def _neon_stream_loop(
             # Get the next video frame and gaze data
             frame, gaze = pl_device.receive_matched_scene_video_frame_and_gaze()
             
-            # Store latest gaze coordinates (scaled to resized frame)
+            # Crop the original frame first (both streams use same crop)
+            cropped_frame = frame.bgr_pixels[crop_y1:crop_y2, crop_x1:crop_x2]
+            
+            # Calculate gaze coordinates transformation and validity
+            gaze_final_x = 0.0
+            gaze_final_y = 0.0
+            gaze_is_valid = False
+            
             if gaze_x_shared is not None and gaze_y_shared is not None and gaze_valid_shared is not None and gaze is not None:
-                # Scale gaze coordinates to match the resized raw frame
-                scale_x = target_width / RAW_WIDTH
-                scale_y = target_height / RAW_HEIGHT
-                gaze_x_scaled = gaze.x * scale_x
-                gaze_y_scaled = gaze.y * scale_y
+                # Check if gaze falls within cropped region (using original coordinates)
+                gaze_in_crop = (crop_x1 <= gaze.x <= crop_x2) and (crop_y1 <= gaze.y <= crop_y2)
                 
-                gaze_x_shared.value = gaze_x_scaled
-                gaze_y_shared.value = gaze_y_scaled
-                gaze_valid_shared.value = 1
+                if gaze_in_crop:
+                    # Transform gaze coordinates from original frame to cropped/resized frame:
+                    # 1. Subtract crop offset to get coordinates relative to crop
+                    # 2. Scale to match target resolution
+                    scale_x = target_width / crop_width
+                    scale_y = target_height / crop_height
+                    gaze_final_x = (gaze.x - crop_x1) * scale_x
+                    gaze_final_y = (gaze.y - crop_y1) * scale_y
+                    gaze_is_valid = True
+                
+                # Update shared gaze coordinates for external access
+                gaze_x_shared.value = gaze_final_x if gaze_is_valid else 0.0
+                gaze_y_shared.value = gaze_final_y if gaze_is_valid else 0.0
+                gaze_valid_shared.value = 1 if gaze_is_valid else 0
             else:
-                # No valid gaze data available
+                # No valid gaze data available - reset shared values
                 if gaze_x_shared is not None:
                     gaze_x_shared.value = 0.0
                 if gaze_y_shared is not None:
@@ -95,38 +110,36 @@ def _neon_stream_loop(
                 if gaze_valid_shared is not None:
                     gaze_valid_shared.value = 0
 
+            # Resize cropped frame to target resolution (shared base for both streams)
+            final_frame_resized = cv2.resize(cropped_frame, (target_width, target_height), interpolation=cv2.INTER_LINEAR)
+            
+            # Main output (out0): cropped frame without gaze overlay
+            out0.write(final_frame_resized)
+            
+            # Secondary output (out1): cropped frame with gaze overlay (if available)
             if v4l2_device1 is not None:
-                # Create a copy of the frame, resize it and write it to the second V4L2 device (raw data)
-                frame_raw = frame.bgr_pixels.copy()
-                final_frame_raw = cv2.resize(frame_raw, (target_width, target_height), interpolation=cv2.INTER_LINEAR)
-                out1.write(final_frame_raw)
-            
-            # Draw gaze on the frame
-            overlay = frame.bgr_pixels.copy()
-            cv2.circle(
-                overlay,
-                (int(gaze.x), int(gaze.y)),
-                radius=45,
-                color=(0, 0, 255),
-                thickness=8,
-            )
-            alpha = 0.5
-            alpha_overlay = cv2.addWeighted(
-                overlay,
-                alpha,
-                frame.bgr_pixels,
-                1 - alpha,
-                0,
-            )
-            
-            # Crop to central region
-            final_frame_gaze = alpha_overlay[crop_y1:crop_y2, crop_x1:crop_x2]
-            
-            # Resize frame to target resolution
-            final_frame_gaze = cv2.resize(final_frame_gaze, (target_width, target_height), interpolation=cv2.INTER_LINEAR)
-            
-            # Write to the first V4L2 device (gaze-annotated)
-            out0.write(final_frame_gaze)
+                if gaze_is_valid:
+                    # Draw gaze circle on the resized frame using transformed coordinates
+                    gaze_frame = final_frame_resized.copy()
+                    cv2.circle(
+                        gaze_frame,
+                        (int(gaze_final_x), int(gaze_final_y)),
+                        radius=45,
+                        color=(0, 0, 255),
+                        thickness=9,
+                    )
+                    # Blend gaze overlay with original frame
+                    alpha = 0.5
+                    final_frame_gaze = cv2.addWeighted(
+                        gaze_frame, alpha,
+                        final_frame_resized, 1 - alpha,
+                        0,
+                    )
+                else:
+                    # No valid gaze - use clean frame
+                    final_frame_gaze = final_frame_resized
+                
+                out1.write(final_frame_gaze)
                 
     except Exception as e:
         logger.error(f"NeonV4L2Process: Error: {e}")
@@ -222,7 +235,7 @@ class NeonV4L2Process:
         
         Returns:
             Tuple of (gaze_x, gaze_y, gaze_valid) where:
-            - gaze_x, gaze_y: scaled pixel coordinates matching the resized raw frame (0 if invalid)
-            - gaze_valid: integer mask (0=invalid, 1=valid) indicating if gaze data is valid
+            - gaze_x, gaze_y: pixel coordinates relative to cropped/resized frame (0 if invalid)
+            - gaze_valid: integer mask (0=invalid, 1=valid) indicating if gaze data is valid and within cropped region
         """
         return (self._gaze_x_shared.value, self._gaze_y_shared.value, self._gaze_valid_shared.value)

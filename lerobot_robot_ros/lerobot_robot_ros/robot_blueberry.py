@@ -22,9 +22,22 @@ class BlueberryROS(Robot):
         super().__init__(config)
         self.config = config
         self.ros_interface = BlueberryROSInterface(config)
-        pl_neon_cfg = self.config.cameras["user"]
-        self.pl_neon_streamer = NeonV4L2Process(v4l2_device0="/dev/video20", 
-                                                v4l2_device1="/dev/video21" if "user_raw" in self.config.cameras else None,
+        
+        # Get user camera config if available, otherwise use gaze camera config as fallback
+        if "user" in self.config.cameras:
+            pl_neon_cfg = self.config.cameras["user"]
+        elif "user_gaze" in self.config.cameras:
+            pl_neon_cfg = self.config.cameras["user_gaze"]
+        else:
+            # Neither user camera is available, use default values
+            pl_neon_cfg = type('Config', (), {
+                'fps': config.cam_fps if hasattr(config, 'cam_fps') else 15,
+                'width': config.cam_width if hasattr(config, 'cam_width') else 320,
+                'height': config.cam_height if hasattr(config, 'cam_height') else 240
+            })()
+        
+        self.pl_neon_streamer = NeonV4L2Process(v4l2_device0="/dev/video20" if config.record_user_cam else None,  
+                                                v4l2_device1="/dev/video21" if config.record_user_gaze_cam else None,
                                                 fps=pl_neon_cfg.fps, 
                                                 target_width=pl_neon_cfg.width, 
                                                 target_height=pl_neon_cfg.height)

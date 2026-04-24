@@ -31,6 +31,7 @@ def main():
     # I/O setup
     io = IOManager(audio_enabled=PLAY_SOUNDS, tts_engine="gtts")
     io.notify(io.UPDATE, "Initialising data collection...")
+    io.log(f"Writing to dataset: {HF_REPO_ID}")
 
     # Create the robot and teleoperator configurations
     robot_config = BlueberryROSConfig() # default config

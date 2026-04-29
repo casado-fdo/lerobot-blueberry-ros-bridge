@@ -5,16 +5,18 @@ import time
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.utils.constants import ACTION
 from lerobot.utils.robot_utils import precise_sleep
-from utils import log_say
 import os
 import argparse
 from lerobot_robot_ros import BlueberryROS, BlueberryROSConfig
+from lerobot_ros_bridge.utils import IOManager
 
 HF_USERNAME = os.getenv("HUGGINGFACE_USERNAME", "your-username-here")
 
 def main(hf_dataset_name: str, episode_idx: int):
-    log_say("Initialising episode replay...", play_sounds=False)
 
+    # I/O setup
+    io = IOManager(audio_enabled=play_sounds, tts_engine="gtts")
+    io.notify(io.UPDATE, "Initialising episode replay...")
 
     hf_repo_id = f"{HF_USERNAME}/{hf_dataset_name}"
 
@@ -36,7 +38,7 @@ def main(hf_dataset_name: str, episode_idx: int):
     if not robot.is_connected:
         raise ValueError("Robot is not connected!")
 
-    log_say(f"Replaying episode {episode_idx}", play_sounds=False)
+    io.notify(io.UPDATE, f"Replaying episode {episode_idx}")
     for idx in range(len(episode_frames)):
         t0 = time.perf_counter()
 

@@ -75,7 +75,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_id", type=str, default=None, help="HuggingFace dataset name to use for stats")
     parser.add_argument("--play_sounds", type=bool, default=os.getenv("PLAY_SOUNDS", "true").lower() == "true", help="Play sounds during evaluation (default: true)")
     parser.add_argument("--num_episodes", type=int, default=int(os.getenv("RECORDING_NUM_EPISODES", "1")), help="Number of episodes to evaluate (default: 1)")
-    parser.add_argument("--fps", type=int, default=int(os.getenv("RECORDING_FPS", "30")), help="Frames per second for evaluation (default: 30)")
+    parser.add_argument("--fps", type=int, default=int(os.getenv("RECORDING_FPS", "15")), help="Frames per second for evaluation (default: 15)")
     parser.add_argument("--episode_time_sec", type=int, default=int(os.getenv("RECORDING_EPISODE_TIME_SEC", "10")), help="Duration of each episode in seconds (default: 10)")
     parser.add_argument("--reset_time_sec", type=int, default=int(os.getenv("RECORDING_RESET_TIME_SEC", "5")), help="Time to reset between episodes in seconds (default: 5)")
     parser.add_argument("--task_description", type=str, default=os.getenv("RECORDING_TASK_DESCRIPTION", "No task description provided."), help="Task description for evaluation (default: No task description provided.)")

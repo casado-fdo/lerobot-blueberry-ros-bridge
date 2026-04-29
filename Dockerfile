@@ -69,7 +69,7 @@ RUN python -c "import flash_attn; print(f'Flash Attention {flash_attn.__version_
 RUN pip install dm-tree
 
 # Upgrade lerobot sources to the latest available version
-RUN git clone https://github.com/huggingface/lerobot.git
+RUN git clone https://github.com/huggingface/lerobot.git --branch v0.5.0
 RUN cp -r ./lerobot/* /opt/lerobot/
 
 # Install Pupil Labs eye-tracking glasses dependencies

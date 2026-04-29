@@ -68,8 +68,7 @@ class BlueberryROSConfig(RobotConfig):
         default_factory=lambda: {
             "left": BlueberryROSConfig.left_camera_config, 
             "right": BlueberryROSConfig.right_camera_config,
-            **({"user": BlueberryROSConfig.user_camera_config} if 
-            BlueberryROSConfig.record_user_cam else {}),
+            **({"user": BlueberryROSConfig.user_camera_config} if BlueberryROSConfig.record_user_cam else {}),
             **({"user_gaze": BlueberryROSConfig.user_gaze_camera_config} if BlueberryROSConfig.record_user_gaze_cam else {}),
         })
     

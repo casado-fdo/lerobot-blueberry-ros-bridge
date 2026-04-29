@@ -14,7 +14,7 @@ import rerun as rr
 import traceback
 
 NUM_EPISODES = int(os.getenv("RECORDING_NUM_EPISODES", "1"))
-FPS = int(os.getenv("RECORDING_FPS", "30"))
+FPS = int(os.getenv("RECORDING_FPS", "15"))
 EPISODE_TIME_SEC = int(os.getenv("RECORDING_EPISODE_TIME_SEC", "10"))
 RESET_TIME_SEC = int(os.getenv("RECORDING_RESET_TIME_SEC", "5"))
 TASK_DESCRIPTION = os.getenv("RECORDING_TASK_DESCRIPTION", "No task description provided.")
@@ -25,6 +25,8 @@ RERUN_PORT = int(os.getenv("RERUN_PORT", "9876"))
 HF_USERNAME = os.getenv("HUGGINGFACE_USERNAME", "your-username-here")
 HF_DATASET_NAME = os.getenv("HUGGINGFACE_DATASET_NAME", "default")
 HF_REPO_ID = f"{HF_USERNAME}/{HF_DATASET_NAME}"
+IMG_WRITER_PROC = 0
+IMG_WRITER_THREAD = 16
 
 
 def main():
@@ -60,6 +62,7 @@ def main():
     # Pull existing dataset or create a new one
     try:
         dataset = LeRobotDataset(repo_id=HF_REPO_ID)
+        dataset.start_image_writer(IMG_WRITER_PROC, IMG_WRITER_THREAD)
     except:
         io.log(f"Dataset {HF_REPO_ID} does not exist. Creating a new one.", speak=False)
         dataset = LeRobotDataset.create(
@@ -69,8 +72,8 @@ def main():
             features=dataset_features,
             robot_type=robot.name,
             use_videos=True,
-            image_writer_processes=0,
-            image_writer_threads=16
+            image_writer_processes=IMG_WRITER_PROC,
+            image_writer_threads=IMG_WRITER_THREAD
         )
 
     # Connect the robot and teleoperator

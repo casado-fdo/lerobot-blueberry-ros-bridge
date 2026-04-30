@@ -32,8 +32,8 @@ Other robots and teleoperation interfaces can be added by extending the `lerobot
 
 1. **Clone the repository**:
    ```bash
-   git clone git@github.com:casado-fdo/lerobot-ros-bridge.git
-   cd lerobot-ros-bridge
+   git clone git@github.com:casado-fdo/lerobot-blueberry-ros-bridge.git
+   cd lerobot-blueberry-ros-bridge
    ```
 
 2. **Set up environment**:

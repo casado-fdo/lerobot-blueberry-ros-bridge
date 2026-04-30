@@ -1,4 +1,4 @@
-# LeRobot ROS Bridge
+# LeRobot Blueberry ROS Bridge
 
 A ROS bridge for LeRobot that enables integration with custom robotic platforms, specifically designed for the Blueberry smart robotic wheelchair but can be used as a reference to integrate other robotic platforms.
 
@@ -23,15 +23,16 @@ Other robots and teleoperation interfaces can be added by extending the `lerobot
 
 ### Prerequisites
 
-- NVIDIA Jetson device (tested on AGX Thor)
+- NVIDIA Jetson device (tested on AGX Thor for Blueberry robot)
 - Docker and NVIDIA Container Toolkit
 - Hugging Face account and access token
+- Blueberry robot hardware with Kinova dual-arm system
 
 ### Installation
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/casado-fdo/lerobot-ros-bridge.git
+   git clone git@github.com:casado-fdo/lerobot-ros-bridge.git
    cd lerobot-ros-bridge
    ```
 
